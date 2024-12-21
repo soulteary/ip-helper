@@ -151,8 +151,10 @@
       </div>
       <div class="main-content">
         <div class="search-container">
-          <input type="text" class="search-input" placeholder="请输入要查询的 IP 地址" value="%IP_ADDR%" />
-          <button class="search-button">查询</button>
+          <form action="/" method="post">
+            <input type="text" name="ip" class="search-input" placeholder="请输入要查询的 IP 地址" value="%IP_ADDR%" />
+            <button class="search-button" type="submit">查询</button>  
+          </form>
         </div>
 
         <div class="result-container">

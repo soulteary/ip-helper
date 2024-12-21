@@ -176,8 +176,21 @@ func removeDuplicates(strSlice []string) []string {
 	return result
 }
 
+// 使用 net 包验证 IP 地址
+func isValidIPAddress(ip string) bool {
+	if parsedIP := net.ParseIP(ip); parsedIP != nil {
+		return true
+	}
+	return false
+}
+
 //go:embed public
 var EmbedFS embed.FS
+
+// IPForm 定义表单结构
+type IPForm struct {
+	IP string `form:"ip" binding:"required"`
+}
 
 func main() {
 	config := parseConfig()
@@ -226,6 +239,32 @@ func main() {
 
 		c.Data(200, "text/html; charset=utf-8", template)
 	})
+	// 处理 POST 请求，解析表单数据
+	r.POST("/", func(c *gin.Context) {
+		// 获取请求中的 IP 地址信息
+		ipInfo, exists := c.Get("ip_info")
+		if !exists {
+			c.JSON(500, gin.H{"error": "IP info not found"})
+			return
+		}
+		// 默认 IP 地址为空
+		ip := ""
+		var form IPForm
+		// 使用 ShouldBind 绑定表单数据
+		if err := c.ShouldBind(&form); err != nil {
+			// 如果绑定失败，使用请求中的 IP 地址
+			ip = ipInfo.(IPInfo).RealIP
+		} else {
+			// 获取到 IP 地址后的处理逻辑
+			ip = form.IP
+			// 如果 IP 地址不合法，使用请求中的 IP 地址
+			if !isValidIPAddress(ip) {
+				ip = ipInfo.(IPInfo).RealIP
+			}
+		}
+		c.Redirect(302, fmt.Sprintf("/ip/%s", ip))
+	})
+
 	r.GET("/ip", func(c *gin.Context) {
 		ipInfo, exists := c.Get("ip_info")
 		if !exists {
