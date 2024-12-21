@@ -183,12 +183,9 @@ func isValidIPAddress(ip string) bool {
 	return false
 }
 
-// 判断请求发起方是否为“下载工具”
 func IsDownloadTool(userAgent string) bool {
-	// 转换为小写以便不区分大小写比较
 	ua := strings.ToLower(userAgent)
 
-	// 常见下载工具的特征字符串
 	downloadTools := []string{
 		"curl",
 		"wget",
@@ -281,9 +278,7 @@ func main() {
 			return
 		}
 
-		// 获取请求头中的 User-Agent 信息
 		userAgent := c.GetHeader("User-Agent")
-		// 使用下载工具访问时返回 JSON 格式
 		if IsDownloadTool(userAgent) {
 			c.JSON(200, renderJSON(ipAddr, dbInfo))
 		} else {
@@ -326,9 +321,7 @@ func main() {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
-		// 获取请求头中的 User-Agent 信息
 		userAgent := c.GetHeader("User-Agent")
-		// 使用下载工具访问时返回 JSON 格式
 		if IsDownloadTool(userAgent) {
 			c.JSON(200, renderJSON(ipAddr, dbInfo))
 		} else {
