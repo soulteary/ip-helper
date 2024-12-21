@@ -176,7 +176,6 @@ func removeDuplicates(strSlice []string) []string {
 	return result
 }
 
-// 使用 net 包验证 IP 地址
 func isValidIPAddress(ip string) bool {
 	if parsedIP := net.ParseIP(ip); parsedIP != nil {
 		return true
@@ -187,7 +186,6 @@ func isValidIPAddress(ip string) bool {
 //go:embed public
 var EmbedFS embed.FS
 
-// IPForm 定义表单结构
 type IPForm struct {
 	IP string `form:"ip" binding:"required"`
 }
@@ -212,52 +210,74 @@ func main() {
 
 	r.Use(authMiddleware(config))
 	r.Use(IPAnalyzer())
-	r.GET("/", func(c *gin.Context) {
-		ipInfo, exists := c.Get("ip_info")
-		if !exists {
-			c.JSON(500, gin.H{"error": "IP info not found"})
-			return
+
+	// 获取客户端 IP 信息
+	getClientIPInfo := func(c *gin.Context, ipaddr string) (resultIP string, resultDBInfo []string, err error) {
+		// 判断是否有传入 IP 地址
+		if ipaddr == "" {
+			// 如果没有有效 IP，默认使用发起请求的客户端 IP 信息
+			ipInfo, exists := c.Get("ip_info")
+			if !exists {
+				return resultIP, resultDBInfo, fmt.Errorf("IP info not found")
+			}
+			ipaddr = ipInfo.(IPInfo).RealIP
 		}
 
-		// 查询 IP 地址具体信息
-		dbInfo, err := db.Find(ipInfo.(IPInfo).RealIP, "CN")
+		dbInfo, err := db.Find(ipaddr, "CN")
 		if err != nil {
 			dbInfo = []string{"未找到 IP 地址信息"}
 		}
-		// 读取默认模版
-		template, err := Get(fmt.Sprintf("http://localhost:%s/index.template.html", config.Port))
+		dbInfo = removeDuplicates(dbInfo)
+		return ipaddr, dbInfo, nil
+	}
+
+	// 渲染模板
+	renderTemplate := func(globalTemplate []byte, ipaddr string, dbInfo []string) []byte {
+		template := bytes.ReplaceAll(globalTemplate, []byte("%IP_ADDR%"), []byte(ipaddr))
+		template = bytes.ReplaceAll(template, []byte("%DOMAIN%"), []byte(config.Domain))
+		template = bytes.ReplaceAll(template, []byte("%DATA_1_INFO%"), []byte(strings.Join(removeDuplicates(dbInfo), " ")))
+		return template
+	}
+
+	// 渲染 JSON
+	renderJSON := func(ipaddr string, dbInfo []string) map[string]any {
+		return map[string]any{"ip": ipaddr, "info": dbInfo}
+	}
+
+	globalTemplate := []byte{}
+
+	r.GET("/", func(c *gin.Context) {
+		// 预缓存模板文件
+		if len(globalTemplate) == 0 {
+			globalTemplate, err = Get(fmt.Sprintf("http://localhost:%s/index.template.html", config.Port))
+			if err != nil {
+				log.Fatalf("读取模板文件失败: %v\n", err)
+				return
+			}
+		}
+
+		// 获取客户端 IP 信息，首页不需要传入 IP 地址
+		ipAddr, dbInfo, err := getClientIPInfo(c, "")
 		if err != nil {
-			c.String(500, "读取模板文件失败: %v", err)
+			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
-		// 更新模版中的 IP 地址
-		template = bytes.ReplaceAll(template, []byte("%IP_ADDR%"), []byte(ipInfo.(IPInfo).ClientIP))
-		// 更新模版中的域名
-		template = bytes.ReplaceAll(template, []byte("%DOMAIN%"), []byte(config.Domain))
-		// 更新模版中的 IP 地址信息
-		template = bytes.ReplaceAll(template, []byte("%DATA_1_INFO%"), []byte(strings.Join(removeDuplicates(dbInfo), " ")))
-
-		c.Data(200, "text/html; charset=utf-8", template)
+		// 返回渲染后的 HTML 内容
+		c.Data(200, "text/html; charset=utf-8", renderTemplate(globalTemplate, ipAddr, dbInfo))
 	})
-	// 处理 POST 请求，解析表单数据
+
 	r.POST("/", func(c *gin.Context) {
-		// 获取请求中的 IP 地址信息
 		ipInfo, exists := c.Get("ip_info")
 		if !exists {
 			c.JSON(500, gin.H{"error": "IP info not found"})
 			return
 		}
-		// 默认 IP 地址为空
 		ip := ""
 		var form IPForm
-		// 使用 ShouldBind 绑定表单数据
 		if err := c.ShouldBind(&form); err != nil {
-			// 如果绑定失败，使用请求中的 IP 地址
 			ip = ipInfo.(IPInfo).RealIP
 		} else {
-			// 获取到 IP 地址后的处理逻辑
 			ip = form.IP
-			// 如果 IP 地址不合法，使用请求中的 IP 地址
 			if !isValidIPAddress(ip) {
 				ip = ipInfo.(IPInfo).RealIP
 			}
@@ -273,23 +293,16 @@ func main() {
 		}
 		c.JSON(200, ipInfo)
 	})
-	r.GET("/ip/:ip", func(c *gin.Context) {
-		ipaddr := c.Param("ip")
-		if ipaddr == "" {
-			ipInfo, exists := c.Get("ip_info")
-			if !exists {
-				c.JSON(500, gin.H{"error": "IP info not found"})
-				return
-			}
-			ipaddr = ipInfo.(IPInfo).RealIP
-		}
 
-		dbInfo, err := db.Find(ipaddr, "CN")
+	r.GET("/ip/:ip", func(c *gin.Context) {
+		ip := c.Param("ip")
+		// 获取指定 IP 地址的信息
+		ipAddr, dbInfo, err := getClientIPInfo(c, ip)
 		if err != nil {
-			dbInfo = []string{"未找到 IP 地址信息"}
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
 		}
-		dbInfo = removeDuplicates(dbInfo)
-		c.JSON(200, map[string]any{"ip": ipaddr, "info": dbInfo})
+		c.JSON(200, renderJSON(ipAddr, dbInfo))
 	})
 
 	serverAddr := fmt.Sprintf(":%s", config.Port)
