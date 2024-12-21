@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/md5"
 	"embed"
 	"flag"
 	"fmt"
@@ -11,7 +12,9 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	static "github.com/soulteary/gin-static"
 	"github.com/soulteary/ipdb-go"
@@ -205,6 +208,26 @@ func IsDownloadTool(userAgent string) bool {
 	return false
 }
 
+func cacheMiddleware() gin.HandlerFunc {
+	data := []byte(time.Now().String())
+	etag := fmt.Sprintf("W/%x", md5.Sum(data))
+
+	return func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/") {
+			c.Header("Cache-Control", "private, max-age=86400")
+
+			if match := c.GetHeader("If-None-Match"); match != "" {
+				if strings.Contains(match, etag) {
+					c.Status(http.StatusNotModified)
+					return
+				}
+			}
+		}
+
+		c.Next()
+	}
+}
+
 //go:embed public
 var EmbedFS embed.FS
 
@@ -221,12 +244,17 @@ func main() {
 	}
 
 	r := gin.Default()
+	r.Use(gin.Recovery())
+	r.Use(gzip.Gzip(gzip.BestCompression))
+
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"status": "ok",
 			"domain": config.Domain,
 		})
 	})
+
+	r.Use(cacheMiddleware())
 
 	r.Use(static.Serve("/", static.LocalFile("./public", false)))
 
@@ -250,10 +278,11 @@ func main() {
 		return ipaddr, dbInfo, nil
 	}
 
-	renderTemplate := func(globalTemplate []byte, ipaddr string, dbInfo []string) []byte {
+	renderTemplate := func(c *gin.Context, globalTemplate []byte, ipaddr string, dbInfo []string) []byte {
 		template := bytes.ReplaceAll(globalTemplate, []byte("%IP_ADDR%"), []byte(ipaddr))
 		template = bytes.ReplaceAll(template, []byte("%DOMAIN%"), []byte(config.Domain))
 		template = bytes.ReplaceAll(template, []byte("%DATA_1_INFO%"), []byte(strings.Join(removeDuplicates(dbInfo), " ")))
+		template = bytes.ReplaceAll(template, []byte("%DOCUMENT_PATH%"), []byte(c.Request.URL.Path))
 		return template
 	}
 
@@ -282,7 +311,7 @@ func main() {
 		if IsDownloadTool(userAgent) {
 			c.JSON(200, renderJSON(ipAddr, dbInfo))
 		} else {
-			c.Data(200, "text/html; charset=utf-8", renderTemplate(globalTemplate, ipAddr, dbInfo))
+			c.Data(200, "text/html; charset=utf-8", renderTemplate(c, globalTemplate, ipAddr, dbInfo))
 		}
 	})
 
@@ -321,11 +350,12 @@ func main() {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
+
 		userAgent := c.GetHeader("User-Agent")
 		if IsDownloadTool(userAgent) {
 			c.JSON(200, renderJSON(ipAddr, dbInfo))
 		} else {
-			c.Data(200, "text/html; charset=utf-8", renderTemplate(globalTemplate, ipAddr, dbInfo))
+			c.Data(200, "text/html; charset=utf-8", renderTemplate(c, globalTemplate, ipAddr, dbInfo))
 		}
 	})
 
