@@ -236,11 +236,8 @@ func main() {
 	r.Use(authMiddleware(config))
 	r.Use(IPAnalyzer())
 
-	// 获取客户端 IP 信息
 	getClientIPInfo := func(c *gin.Context, ipaddr string) (resultIP string, resultDBInfo []string, err error) {
-		// 判断是否有传入 IP 地址
 		if ipaddr == "" {
-			// 如果没有有效 IP，默认使用发起请求的客户端 IP 信息
 			ipInfo, exists := c.Get("ip_info")
 			if !exists {
 				return resultIP, resultDBInfo, fmt.Errorf("IP info not found")
@@ -256,7 +253,6 @@ func main() {
 		return ipaddr, dbInfo, nil
 	}
 
-	// 渲染模板
 	renderTemplate := func(globalTemplate []byte, ipaddr string, dbInfo []string) []byte {
 		template := bytes.ReplaceAll(globalTemplate, []byte("%IP_ADDR%"), []byte(ipaddr))
 		template = bytes.ReplaceAll(template, []byte("%DOMAIN%"), []byte(config.Domain))
@@ -264,7 +260,6 @@ func main() {
 		return template
 	}
 
-	// 渲染 JSON
 	renderJSON := func(ipaddr string, dbInfo []string) map[string]any {
 		return map[string]any{"ip": ipaddr, "info": dbInfo}
 	}
@@ -272,7 +267,6 @@ func main() {
 	globalTemplate := []byte{}
 
 	r.GET("/", func(c *gin.Context) {
-		// 预缓存模板文件
 		if len(globalTemplate) == 0 {
 			globalTemplate, err = Get(fmt.Sprintf("http://localhost:%s/index.template.html", config.Port))
 			if err != nil {
@@ -281,7 +275,6 @@ func main() {
 			}
 		}
 
-		// 获取客户端 IP 信息，首页不需要传入 IP 地址
 		ipAddr, dbInfo, err := getClientIPInfo(c, "")
 		if err != nil {
 			c.JSON(500, gin.H{"error": err.Error()})
