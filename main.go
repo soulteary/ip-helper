@@ -4,7 +4,9 @@ import (
 	"embed"
 	"flag"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -71,6 +73,24 @@ func authMiddleware(config *Config) gin.HandlerFunc {
 	}
 }
 
+func Get(link string) ([]byte, error) {
+	resp, err := http.Get(link)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("服务器返回非200状态码: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("读取响应内容失败: %v", err)
+	}
+	return body, nil
+}
+
 //go:embed public
 var EmbedFS embed.FS
 
@@ -84,11 +104,16 @@ func main() {
 			"domain": config.Domain,
 		})
 	})
+
 	r.Use(static.Serve("/", static.LocalFile("./public", false)))
 
 	r.Use(authMiddleware(config))
 	r.GET("/", func(c *gin.Context) {
-		buf, _ := os.ReadFile("template/index.html")
+		buf, err := Get(fmt.Sprintf("http://localhost:%s/index.template.html", config.Port))
+		if err != nil {
+			c.String(500, "读取模板文件失败: %v", err)
+			return
+		}
 		c.Data(200, "text/html; charset=utf-8", buf)
 	})
 
