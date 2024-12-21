@@ -1,12 +1,14 @@
 package main
 
 import (
+	"embed"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 
 	"github.com/gin-gonic/gin"
+	static "github.com/soulteary/gin-static"
 )
 
 type Config struct {
@@ -69,6 +71,9 @@ func authMiddleware(config *Config) gin.HandlerFunc {
 	}
 }
 
+//go:embed public
+var EmbedFS embed.FS
+
 func main() {
 	config := parseConfig()
 
@@ -79,13 +84,12 @@ func main() {
 			"domain": config.Domain,
 		})
 	})
+	r.Use(static.Serve("/", static.LocalFile("./public", false)))
 
 	r.Use(authMiddleware(config))
 	r.GET("/", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"message": "Hello, World!",
-			"domain":  config.Domain,
-		})
+		buf, _ := os.ReadFile("template/index.html")
+		c.Data(200, "text/html; charset=utf-8", buf)
 	})
 
 	serverAddr := fmt.Sprintf(":%s", config.Port)

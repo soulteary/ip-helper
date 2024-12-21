@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- 背景 -->
+  <rect width="200" height="200" fill="transparent"/>
+  
+  <!-- 头部轮廓 - 白色像素 -->
+  <rect x="60" y="40" width="20" height="20" fill="white"/>
+  <rect x="80" y="40" width="40" height="20" fill="white"/>
+  <rect x="120" y="40" width="20" height="20" fill="white"/>
+  <rect x="40" y="60" width="120" height="80" fill="white"/>
+  
+  <!-- 耳朵 - 黑色像素 -->
+  <rect x="40" y="40" width="20" height="20" fill="#333"/>
+  <rect x="140" y="40" width="20" height="20" fill="#333"/>
+  
+  <!-- 眼睛周围 - 黑色像素 -->
+  <rect x="60" y="80" width="20" height="20" fill="#333"/>
+  <rect x="120" y="80" width="20" height="20" fill="#333"/>
+  
+  <!-- 鼻子 - 黑色像素 -->
+  <rect x="90" y="100" width="20" height="20" fill="#333"/>
+  
+  <!-- 嘴部 - 浅粉色像素 -->
+  <rect x="80" y="120" width="40" height="10" fill="#FFB6C1"/>
+
+  <!-- 帽衫边缘 - 灰色像素 -->
+  <rect x="30" y="140" width="140" height="20" fill="#888"/>
+</svg>
