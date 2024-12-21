@@ -163,22 +163,16 @@ func isPrivateIP(ipStr string) bool {
 	return false
 }
 
-// 帮助我们对数据库中的内容进行去重
-// eg: ["CLOUDFLARE.COM","CLOUDFLARE.COM",""] => ["CLOUDFLARE.COM",""]
-
 func removeDuplicates(strSlice []string) []string {
-	// 创建一个 map 用于存储唯一的字符串
 	encountered := make(map[string]bool)
 	result := []string{}
 
-	// 遍历切片，将未出现过的字符串添加到结果中
 	for _, str := range strSlice {
 		if !encountered[str] {
 			encountered[str] = true
 			result = append(result, str)
 		}
 	}
-
 	return result
 }
 
@@ -188,13 +182,10 @@ var EmbedFS embed.FS
 func main() {
 	config := parseConfig()
 
-	// 初始化 IP 数据库
 	db, err := ipdb.NewCity("./data/ipipfree.ipdb")
 	if err != nil {
 		log.Fatal(err)
 	}
-	// 更新 ipdb 文件后可调用 Reload 方法重新加载内容
-	// db.Reload("./data/ipipfree.ipdb")
 
 	r := gin.Default()
 	r.GET("/health", func(c *gin.Context) {
@@ -215,18 +206,26 @@ func main() {
 			return
 		}
 
-		buf, err := Get(fmt.Sprintf("http://localhost:%s/index.template.html", config.Port))
+		// 查询 IP 地址具体信息
+		dbInfo, err := db.Find(ipInfo.(IPInfo).RealIP, "CN")
+		if err != nil {
+			dbInfo = []string{"未找到 IP 地址信息"}
+		}
+		// 读取默认模版
+		template, err := Get(fmt.Sprintf("http://localhost:%s/index.template.html", config.Port))
 		if err != nil {
 			c.String(500, "读取模板文件失败: %v", err)
 			return
 		}
+		// 更新模版中的 IP 地址
+		template = bytes.ReplaceAll(template, []byte("%IP_ADDR%"), []byte(ipInfo.(IPInfo).ClientIP))
+		// 更新模版中的域名
+		template = bytes.ReplaceAll(template, []byte("%DOMAIN%"), []byte(config.Domain))
+		// 更新模版中的 IP 地址信息
+		template = bytes.ReplaceAll(template, []byte("%DATA_1_INFO%"), []byte(strings.Join(removeDuplicates(dbInfo), " ")))
 
-		// TODO 将 IP 信息传递给模板
-		fmt.Println(ipInfo)
-
-		c.Data(200, "text/html; charset=utf-8", buf)
+		c.Data(200, "text/html; charset=utf-8", template)
 	})
-	// 获取当前请求方的 IP 地址信息
 	r.GET("/ip", func(c *gin.Context) {
 		ipInfo, exists := c.Get("ip_info")
 		if !exists {
@@ -235,11 +234,8 @@ func main() {
 		}
 		c.JSON(200, ipInfo)
 	})
-	// 获取指定 IP 地址信息
 	r.GET("/ip/:ip", func(c *gin.Context) {
-		// 获取 URL 中的 IP 地址
 		ipaddr := c.Param("ip")
-		fmt.Println("ip", ipaddr)
 		if ipaddr == "" {
 			ipInfo, exists := c.Get("ip_info")
 			if !exists {

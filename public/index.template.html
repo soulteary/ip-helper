@@ -151,34 +151,34 @@
       </div>
       <div class="main-content">
         <div class="search-container">
-          <input type="text" class="search-input" placeholder="请输入要查询的 IP 地址" value="123.123.123.123" />
+          <input type="text" class="search-input" placeholder="请输入要查询的 IP 地址" value="%IP_ADDR%" />
           <button class="search-button">查询</button>
         </div>
 
         <div class="result-container">
           <div class="result-row">
             <div class="result-label">IP</div>
-            <div class="result-value">123.123.123.123</div>
+            <div class="result-value">%IP_ADDR%</div>
           </div>
           <div class="result-row">
             <div class="result-label">地址</div>
-            <div class="result-value">中国 上海</div>
+            <div class="result-value">%DATA_1_INFO%</div>
           </div>
-          <div class="result-row">
+          <!-- <div class="result-row">
             <div class="result-label">运营商</div>
             <div class="result-value">联通</div>
-          </div>
+          </div> -->
           <div class="result-row">
             <div class="result-label">数据二</div>
-            <div class="result-value">中国上海上海 | 联通</div>
+            <div class="result-value">等待接入</div>
           </div>
           <div class="result-row">
             <div class="result-label">数据三</div>
-            <div class="result-value">中国上海上海市 | 联通</div>
+            <div class="result-value">等待接入</div>
           </div>
           <div class="result-row">
             <div class="result-label">URL</div>
-            <div class="result-value">http://www.cip.cc/123.123.123.123</div>
+            <div class="result-value">http://%DOMAIN%/%IP_ADDR%</div>
           </div>
         </div>
 
@@ -190,7 +190,7 @@
             </div>
             <div class="command-code">
               <span class="command-prompt">#</span>
-              <input id="command-curl" type="text" value="curl cip.cc" />
+              <input id="command-curl" type="text" value="curl %DOMAIN%" />
             </div>
           </div>
           <div class="command-row">
@@ -199,7 +199,7 @@
             </div>
             <div class="command-code">
               <span class="command-prompt">></span>
-              <input id="command-telenet" type="text" value="telnet cip.cc" />
+              <input id="command-telenet" type="text" value="telnet %DOMAIN%" />
             </div>
           </div>
           <div class="command-row">
@@ -208,7 +208,7 @@
             </div>
             <div class="command-code">
               <span class="command-prompt">></span>
-              <input id="command-ftp" type="text" value="ftp cip.cc" />
+              <input id="command-ftp" type="text" value="ftp %DOMAIN%" />
             </div>
           </div>
 
@@ -219,7 +219,7 @@
             </div>
             <div class="command-code">
               <span class="command-prompt">#</span>
-              <input id="command-curl-ip-only" type="text" value="curl ip.cip.cc" />
+              <input id="command-curl-ip-only" type="text" value="curl %DOMAIN%/ip" />
             </div>
           </div>
         </div>
