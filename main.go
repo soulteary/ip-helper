@@ -14,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	static "github.com/soulteary/gin-static"
+	"github.com/soulteary/ipdb-go"
 )
 
 type Config struct {
@@ -89,7 +90,6 @@ func Get(link string) ([]byte, error) {
 	return body, nil
 }
 
-// IPInfo 存储 IP 相关信息
 type IPInfo struct {
 	ClientIP     string `json:"client_ip"`
 	ProxyIP      string `json:"proxy_ip,omitempty"`
@@ -98,28 +98,22 @@ type IPInfo struct {
 	RealIP       string `json:"real_ip"`
 }
 
-// 获取并分析 IP 信息的中间件
 func IPAnalyzer() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ipInfo := analyzeIP(c)
-		// 将 IP 信息存储到上下文中
 		c.Set("ip_info", ipInfo)
 		c.Next()
 	}
 }
 
-// 分析 IP 信息
 func analyzeIP(c *gin.Context) IPInfo {
 	var ipInfo IPInfo
 
-	// 获取客户端 IP
 	ipInfo.ClientIP = c.ClientIP()
 
-	// 获取 X-Forwarded-For 头信息
 	forwardedFor := c.GetHeader("X-Forwarded-For")
 	if forwardedFor != "" {
 		ipInfo.ForwardedFor = forwardedFor
-		// X-Forwarded-For 可能包含多个 IP，第一个是原始客户端 IP
 		ips := strings.Split(forwardedFor, ",")
 		if len(ips) > 0 {
 			ipInfo.RealIP = strings.TrimSpace(ips[0])
@@ -132,7 +126,6 @@ func analyzeIP(c *gin.Context) IPInfo {
 		ipInfo.RealIP = ipInfo.ClientIP
 	}
 
-	// 获取 X-Real-IP 头信息
 	xRealIP := c.GetHeader("X-Real-IP")
 	if xRealIP != "" && xRealIP != ipInfo.RealIP {
 		ipInfo.IsProxy = true
@@ -140,7 +133,6 @@ func analyzeIP(c *gin.Context) IPInfo {
 		ipInfo.RealIP = xRealIP
 	}
 
-	// 检查是否为私有 IP
 	if isPrivateIP(ipInfo.ClientIP) {
 		ipInfo.IsProxy = true
 	}
@@ -148,14 +140,12 @@ func analyzeIP(c *gin.Context) IPInfo {
 	return ipInfo
 }
 
-// 检查是否为私有 IP 地址
 func isPrivateIP(ipStr string) bool {
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
 		return false
 	}
 
-	// 检查是否为私有 IP 范围
 	privateIPRanges := []struct {
 		start net.IP
 		end   net.IP
@@ -173,11 +163,38 @@ func isPrivateIP(ipStr string) bool {
 	return false
 }
 
+// 帮助我们对数据库中的内容进行去重
+// eg: ["CLOUDFLARE.COM","CLOUDFLARE.COM",""] => ["CLOUDFLARE.COM",""]
+
+func removeDuplicates(strSlice []string) []string {
+	// 创建一个 map 用于存储唯一的字符串
+	encountered := make(map[string]bool)
+	result := []string{}
+
+	// 遍历切片，将未出现过的字符串添加到结果中
+	for _, str := range strSlice {
+		if !encountered[str] {
+			encountered[str] = true
+			result = append(result, str)
+		}
+	}
+
+	return result
+}
+
 //go:embed public
 var EmbedFS embed.FS
 
 func main() {
 	config := parseConfig()
+
+	// 初始化 IP 数据库
+	db, err := ipdb.NewCity("./data/ipipfree.ipdb")
+	if err != nil {
+		log.Fatal(err)
+	}
+	// 更新 ipdb 文件后可调用 Reload 方法重新加载内容
+	// db.Reload("./data/ipipfree.ipdb")
 
 	r := gin.Default()
 	r.GET("/health", func(c *gin.Context) {
@@ -190,10 +207,8 @@ func main() {
 	r.Use(static.Serve("/", static.LocalFile("./public", false)))
 
 	r.Use(authMiddleware(config))
-	// 使用IP分析中间件
 	r.Use(IPAnalyzer())
 	r.GET("/", func(c *gin.Context) {
-		// 先获取 IP 信息
 		ipInfo, exists := c.Get("ip_info")
 		if !exists {
 			c.JSON(500, gin.H{"error": "IP info not found"})
@@ -211,7 +226,7 @@ func main() {
 
 		c.Data(200, "text/html; charset=utf-8", buf)
 	})
-	// 单独提供一个接口，来获取 IP 信息
+	// 获取当前请求方的 IP 地址信息
 	r.GET("/ip", func(c *gin.Context) {
 		ipInfo, exists := c.Get("ip_info")
 		if !exists {
@@ -219,6 +234,27 @@ func main() {
 			return
 		}
 		c.JSON(200, ipInfo)
+	})
+	// 获取指定 IP 地址信息
+	r.GET("/ip/:ip", func(c *gin.Context) {
+		// 获取 URL 中的 IP 地址
+		ipaddr := c.Param("ip")
+		fmt.Println("ip", ipaddr)
+		if ipaddr == "" {
+			ipInfo, exists := c.Get("ip_info")
+			if !exists {
+				c.JSON(500, gin.H{"error": "IP info not found"})
+				return
+			}
+			ipaddr = ipInfo.(IPInfo).RealIP
+		}
+
+		dbInfo, err := db.Find(ipaddr, "CN")
+		if err != nil {
+			dbInfo = []string{"未找到 IP 地址信息"}
+		}
+		dbInfo = removeDuplicates(dbInfo)
+		c.JSON(200, map[string]any{"ip": ipaddr, "info": dbInfo})
 	})
 
 	serverAddr := fmt.Sprintf(":%s", config.Port)
