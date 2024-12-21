@@ -183,6 +183,31 @@ func isValidIPAddress(ip string) bool {
 	return false
 }
 
+// 判断请求发起方是否为“下载工具”
+func IsDownloadTool(userAgent string) bool {
+	// 转换为小写以便不区分大小写比较
+	ua := strings.ToLower(userAgent)
+
+	// 常见下载工具的特征字符串
+	downloadTools := []string{
+		"curl",
+		"wget",
+		"aria2",
+		"python-requests",
+		"axios",
+		"got",
+		"postman",
+	}
+
+	for _, tool := range downloadTools {
+		if strings.Contains(ua, tool) {
+			return true
+		}
+	}
+
+	return false
+}
+
 //go:embed public
 var EmbedFS embed.FS
 
@@ -262,8 +287,15 @@ func main() {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
-		// 返回渲染后的 HTML 内容
-		c.Data(200, "text/html; charset=utf-8", renderTemplate(globalTemplate, ipAddr, dbInfo))
+
+		// 获取请求头中的 User-Agent 信息
+		userAgent := c.GetHeader("User-Agent")
+		// 使用下载工具访问时返回 JSON 格式
+		if IsDownloadTool(userAgent) {
+			c.JSON(200, renderJSON(ipAddr, dbInfo))
+		} else {
+			c.Data(200, "text/html; charset=utf-8", renderTemplate(globalTemplate, ipAddr, dbInfo))
+		}
 	})
 
 	r.POST("/", func(c *gin.Context) {
@@ -296,13 +328,19 @@ func main() {
 
 	r.GET("/ip/:ip", func(c *gin.Context) {
 		ip := c.Param("ip")
-		// 获取指定 IP 地址的信息
 		ipAddr, dbInfo, err := getClientIPInfo(c, ip)
 		if err != nil {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(200, renderJSON(ipAddr, dbInfo))
+		// 获取请求头中的 User-Agent 信息
+		userAgent := c.GetHeader("User-Agent")
+		// 使用下载工具访问时返回 JSON 格式
+		if IsDownloadTool(userAgent) {
+			c.JSON(200, renderJSON(ipAddr, dbInfo))
+		} else {
+			c.Data(200, "text/html; charset=utf-8", renderTemplate(globalTemplate, ipAddr, dbInfo))
+		}
 	})
 
 	serverAddr := fmt.Sprintf(":%s", config.Port)
