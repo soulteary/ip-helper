@@ -19,6 +19,7 @@ import (
 	fn "github.com/soulteary/ip-helper/model/fn"
 	ipInfo "github.com/soulteary/ip-helper/model/ip-info"
 	configParser "github.com/soulteary/ip-helper/model/parse-config"
+	"github.com/soulteary/ip-helper/model/response"
 )
 
 func authMiddleware(config *define.Config) gin.HandlerFunc {
@@ -66,10 +67,6 @@ func cacheMiddleware() gin.HandlerFunc {
 	}
 }
 
-func renderJSON(ipaddr string, dbInfo []string) map[string]any {
-	return map[string]any{"ip": ipaddr, "info": dbInfo}
-}
-
 func TelnetServer(ipdb *ipInfo.IPDB) {
 	listener, err := net.Listen("tcp", ":23")
 	if err != nil {
@@ -97,7 +94,7 @@ func handleTelnetConnection(ipdb *ipInfo.IPDB, conn net.Conn) {
 	info := ipdb.FindByIPIP(clientIP)
 
 	sendBuf := [][]byte{}
-	message, err := json.Marshal(renderJSON(clientIP, info))
+	message, err := json.Marshal(response.RenderJSON(clientIP, info))
 	if err != nil {
 		fmt.Println("序列化 JSON 数据时发生错误: ", err)
 		return
@@ -138,7 +135,7 @@ func handleFTPConnection(ipdb *ipInfo.IPDB, conn net.Conn) {
 	info := ipdb.FindByIPIP(clientIP)
 
 	sendBuf := [][]byte{}
-	message, err := json.Marshal(renderJSON(clientIP, info))
+	message, err := json.Marshal(response.RenderJSON(clientIP, info))
 	if err != nil {
 		fmt.Println("序列化 JSON 数据时发生错误: ", err)
 		return
@@ -202,16 +199,6 @@ func main() {
 		return ipaddr, dbInfo, nil
 	}
 
-	renderTemplate := func(c *gin.Context, globalTemplate []byte, ipaddr string, dbInfo []string) []byte {
-		template := bytes.ReplaceAll(globalTemplate, []byte("%IP_ADDR%"), []byte(ipaddr))
-		template = bytes.ReplaceAll(template, []byte("%DOMAIN%"), []byte(config.Domain))
-		template = bytes.ReplaceAll(template, []byte("%DATA_1_INFO%"), []byte(strings.Join(fn.RemoveDuplicates(dbInfo), " ")))
-		template = bytes.ReplaceAll(template, []byte("%DOCUMENT_PATH%"), []byte(c.Request.URL.Path))
-		template = bytes.ReplaceAll(template, []byte("%ONLY_DOMAIN%"), []byte(fn.GetDomainOnly(config.Domain)))
-		template = bytes.ReplaceAll(template, []byte("%ONLY_DOMAIN_WITH_PORT%"), []byte(fn.GetDomainWithPort(config.Domain)))
-		return template
-	}
-
 	globalTemplate := []byte{}
 
 	r.GET("/", func(c *gin.Context) {
@@ -231,9 +218,9 @@ func main() {
 
 		userAgent := c.GetHeader("User-Agent")
 		if fn.IsDownloadTool(userAgent) {
-			c.JSON(200, renderJSON(ipAddr, dbInfo))
+			c.JSON(200, response.RenderJSON(ipAddr, dbInfo))
 		} else {
-			c.Data(200, "text/html; charset=utf-8", renderTemplate(c, globalTemplate, ipAddr, dbInfo))
+			c.Data(200, "text/html; charset=utf-8", response.RenderHTML(config, c.Request.URL.Path, globalTemplate, ipAddr, dbInfo))
 		}
 	})
 
@@ -275,9 +262,9 @@ func main() {
 
 		userAgent := c.GetHeader("User-Agent")
 		if fn.IsDownloadTool(userAgent) {
-			c.JSON(200, renderJSON(ipAddr, dbInfo))
+			c.JSON(200, response.RenderJSON(ipAddr, dbInfo))
 		} else {
-			c.Data(200, "text/html; charset=utf-8", renderTemplate(c, globalTemplate, ipAddr, dbInfo))
+			c.Data(200, "text/html; charset=utf-8", response.RenderHTML(config, c.Request.URL.Path, globalTemplate, ipAddr, dbInfo))
 		}
 	})
 
