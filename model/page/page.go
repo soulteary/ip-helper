@@ -1,3 +1,6 @@
+package page
+
+const Template = `
 <!DOCTYPE html>
 <html lang="zh-Hans">
   <head>
@@ -234,3 +237,4 @@
     </div>
   </body>
 </html>
+`

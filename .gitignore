@@ -2,3 +2,4 @@
 *.ipdb
 coverage.out
 coverage.html
+index.template.html

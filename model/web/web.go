@@ -3,6 +3,7 @@ package web
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/gin-contrib/gzip"
 	static "github.com/soulteary/gin-static"
@@ -11,6 +12,7 @@ import (
 	"github.com/soulteary/ip-helper/model/define"
 	"github.com/soulteary/ip-helper/model/fn"
 	ipInfo "github.com/soulteary/ip-helper/model/ip-info"
+	"github.com/soulteary/ip-helper/model/page"
 	"github.com/soulteary/ip-helper/model/response"
 )
 
@@ -48,11 +50,15 @@ func Server(config *define.Config, ipdb *ipInfo.IPDB) {
 	r.Use(AuthMiddleware(config))
 	r.Use(IPAnalyzerMiddleware())
 
-	globalTemplate := []byte{}
+	globalTemplate := []byte(page.Template)
+	if config.Debug {
+		os.WriteFile("./public/index.template.html", globalTemplate, 0644)
+	}
+
 	err := error(nil)
 
 	r.GET("/", func(c *gin.Context) {
-		if len(globalTemplate) == 0 {
+		if config.Debug {
 			globalTemplate, err = fn.HTTPGet(fmt.Sprintf("http://localhost:%s/index.template.html", config.Port))
 			if err != nil {
 				log.Fatalf("读取模板文件失败: %v\n", err)
