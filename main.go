@@ -283,9 +283,8 @@ func handleTelnetConnection(ipdb *IPDB, conn net.Conn) {
 	}
 }
 
-// FTPServer 启动一个简单的 FTP 服务器
-func FTPServer() {
-	// 创建监听地址，默认使用 21 端口
+// 增加 IPDB 参数
+func FTPServer(ipdb *IPDB) {
 	listener, err := net.Listen("tcp", ":21")
 	if err != nil {
 		log.Fatalf("Error creating server: %v", err)
@@ -294,39 +293,40 @@ func FTPServer() {
 
 	log.Println("FTP Server listening on :21")
 
-	// 持续监听连接
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
 			log.Printf("Error accepting connection: %v", err)
 			continue
 		}
-		// 为每个连接创建一个新的 goroutine
-		go handleFTPConnection(conn)
+		go handleFTPConnection(ipdb, conn)
 	}
 }
 
-// 处理 FTP 连接
-func handleFTPConnection(conn net.Conn) {
+// 增加 IPDB 参数
+func handleFTPConnection(ipdb *IPDB, conn net.Conn) {
 	defer conn.Close()
 
 	// 获取客户端IP地址
-	remoteAddr := conn.RemoteAddr().String()
+	clientIP := getBaseIP(conn.RemoteAddr().String())
+	info := ipdb.FindByIPIP(clientIP)
 
-	// 发送欢迎消息
-	welcomeMsg := fmt.Sprintf("220 Hello World! Your IP is: %s\r\n", remoteAddr)
-	_, err := conn.Write([]byte(welcomeMsg))
-
+	// 将 IP 地址信息发送给客户端
+	sendBuf := [][]byte{}
+	message, err := json.Marshal(renderJSON(clientIP, info))
 	if err != nil {
-		log.Printf("Error sending welcome message: %v", err)
+		fmt.Println("序列化 JSON 数据时发生错误: ", err)
 		return
 	}
-
-	log.Printf("Client connected from %s", remoteAddr)
-
-	// 强制关闭连接
+	sendBuf = append(sendBuf, []byte("220"))
+	sendBuf = append(sendBuf, message)
+	sendBuf = append(sendBuf, []byte("\r\n"))
+	_, err = conn.Write(bytes.Join(sendBuf, []byte(" ")))
+	if err != nil {
+		log.Println("发送消息时发生错误: ", err)
+		return
+	}
 	conn.Close()
-	log.Printf("Connection closed for %s", remoteAddr)
 }
 
 type IPDB struct {
@@ -472,8 +472,8 @@ func main() {
 	})
 
 	go TelnetServer(&ipdb)
-	// 添加 FTP 服务器
-	go FTPServer()
+	// 将 IPDB 实例传递给 FTP 服务器
+	go FTPServer(&ipdb)
 
 	serverAddr := fmt.Sprintf(":%s", config.Port)
 	log.Printf("启动服务器于 %s:%s\n", config.Domain, config.Port)
