@@ -11,11 +11,15 @@ import (
 func Parse() *define.Config {
 	config := &define.Config{}
 
+	flag.BoolVar(&config.Debug, "debug", false, "调试模式")
 	flag.StringVar(&config.Port, "port", "", "服务器端口")
 	flag.StringVar(&config.Domain, "domain", "", "服务器域名")
 	flag.StringVar(&config.Token, "token", "", "API 访问令牌")
 	flag.Parse()
 
+	if config.Debug {
+		config.Debug = true
+	}
 	if config.Port == "" {
 		config.Port = os.Getenv("SERVER_PORT")
 	}
@@ -26,6 +30,9 @@ func Parse() *define.Config {
 		config.Token = os.Getenv("TOKEN")
 	}
 
+	if config.Debug {
+		log.Println("调试模式已开启")
+	}
 	if config.Port == "" {
 		config.Port = "8080"
 	}
