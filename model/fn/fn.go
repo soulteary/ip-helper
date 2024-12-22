@@ -76,11 +76,12 @@ func IsDownloadTool(userAgent string) bool {
 }
 
 func GetDomainOnly(urlStr string) string {
+	targetURL := urlStr
 	if !strings.Contains(urlStr, "://") {
-		urlStr = "http://" + urlStr
+		targetURL = "http://" + urlStr
 	}
 
-	parsedURL, err := url.Parse(urlStr)
+	parsedURL, err := url.Parse(targetURL)
 	if err != nil {
 		return urlStr
 	}
@@ -90,11 +91,12 @@ func GetDomainOnly(urlStr string) string {
 }
 
 func GetDomainWithPort(urlStr string) string {
+	targetURL := urlStr
 	if !strings.Contains(urlStr, "://") {
-		urlStr = "http://" + urlStr
+		targetURL = "http://" + urlStr
 	}
 
-	parsedURL, err := url.Parse(urlStr)
+	parsedURL, err := url.Parse(targetURL)
 	if err != nil {
 		return urlStr
 	}
