@@ -43,6 +43,7 @@ func CacheMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if strings.HasPrefix(c.Request.URL.Path, "/") {
 			c.Header("Cache-Control", "private, max-age=86400")
+			c.Header("ETag", etag)
 			if match := c.GetHeader("If-None-Match"); match != "" {
 				if strings.Contains(match, etag) {
 					c.Status(http.StatusNotModified)
