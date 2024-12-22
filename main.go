@@ -228,6 +228,46 @@ func cacheMiddleware() gin.HandlerFunc {
 	}
 }
 
+// Telnet 服务器
+func TelnetServer() {
+	// telnet默认端口是 23
+	listener, err := net.Listen("tcp", ":23")
+	if err != nil {
+		fmt.Printf("无法启动telnet服务器: %v\n", err)
+		return
+	}
+	defer listener.Close()
+
+	fmt.Println("Telnet服务器已启动，监听端口 23...")
+
+	// 持续接受新的连接
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			fmt.Printf("接受连接时发生错误: %v\n", err)
+			continue
+		}
+
+		// 为每个连接创建一个新的goroutine
+		go handleConnection(conn)
+	}
+}
+
+func handleConnection(conn net.Conn) {
+	defer conn.Close()
+
+	// 获取客户端 IP 地址
+	clientIP := conn.RemoteAddr().String()
+
+	// 发送消息给客户端
+	message := fmt.Sprintf("Hello World\n您的 IP 地址是: %s\n", clientIP)
+	_, err := conn.Write([]byte(message))
+	if err != nil {
+		fmt.Printf("发送消息时发生错误: %v\n", err)
+		return
+	}
+}
+
 //go:embed public
 var EmbedFS embed.FS
 
@@ -359,6 +399,9 @@ func main() {
 			c.Data(200, "text/html; charset=utf-8", renderTemplate(c, globalTemplate, ipAddr, dbInfo))
 		}
 	})
+
+	// 启动 Telnet 服务器
+	go TelnetServer()
 
 	serverAddr := fmt.Sprintf(":%s", config.Port)
 	log.Printf("启动服务器于 %s:%s\n", config.Domain, config.Port)
