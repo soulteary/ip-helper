@@ -1,161 +1,287 @@
 package configParser_test
 
 import (
+	"bytes"
 	"flag"
+	"log"
 	"os"
+	"strings"
 	"testing"
 
 	configParser "github.com/soulteary/ip-helper/model/parse-config"
 )
 
-// cleanEnv 清理测试用的环境变量
-func cleanEnv() {
+var originalArgs []string
+var originalFlagCommandLine *flag.FlagSet
+
+func init() {
+	originalArgs = os.Args
+	originalFlagCommandLine = flag.CommandLine
+}
+
+func resetFlags() {
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	// 清除所有已定义的标志
+	flag.CommandLine.Init("", flag.ExitOnError)
+}
+
+func clearEnv() {
 	os.Unsetenv("DEBUG")
 	os.Unsetenv("SERVER_PORT")
 	os.Unsetenv("SERVER_DOMAIN")
 	os.Unsetenv("TOKEN")
 }
 
-// cleanArgs 清理命令行参数并保存原始参数
-func cleanArgs() []string {
+func captureLog(f func()) string {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	f()
+	log.SetOutput(os.Stderr)
+	return buf.String()
+}
+
+func TestParseDefaultValues(t *testing.T) {
 	oldArgs := os.Args
-	os.Args = []string{os.Args[0]}
-	return oldArgs
-}
+	os.Args = []string{"cmd"}
 
-// restoreArgs 恢复原始命令行参数
-func restoreArgs(args []string) {
-	os.Args = args
-}
-
-// resetFlags 重置 flag 包的状态
-func resetFlags() {
-	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-}
-
-// TestParseDefault 测试默认配置场景
-func TestParseDefault(t *testing.T) {
-	// 保存并清理环境
-	cleanEnv()
-	oldArgs := cleanArgs()
-	defer restoreArgs(oldArgs)
-	resetFlags()
+	defer func() {
+		os.Args = oldArgs
+		resetFlags()
+		clearEnv()
+	}()
 
 	config := configParser.Parse()
 
-	// 验证默认值
+	if config.Debug {
+		t.Error("Debug 默认值应该为 false")
+	}
+
 	if config.Port != "8080" {
-		t.Errorf("Expected default port to be 8080, got %s", config.Port)
+		t.Errorf("Port 默认值应该为 8080，实际为 %s", config.Port)
 	}
+
 	if config.Domain != "http://localhost:8080" {
-		t.Errorf("Expected default domain to be http://localhost:8080, got %s", config.Domain)
+		t.Errorf("Domain 默认值应该为 http://localhost:8080，实际为 %s", config.Domain)
 	}
+
 	if config.Token != "" {
-		t.Errorf("Expected default token to be empty, got %s", config.Token)
-	}
-	if config.Debug {
-		t.Error("Expected default debug to be false, got true")
+		t.Errorf("Token 默认值应该为空，实际为 %s", config.Token)
 	}
 }
 
-// TestParseCommandLine 测试命令行参数解析
-func TestParseCommandLine(t *testing.T) {
-	cleanEnv()
-	oldArgs := cleanArgs()
-	defer restoreArgs(oldArgs)
-	resetFlags()
-
-	// 设置命令行参数
+func TestParseEmptyValues(t *testing.T) {
+	oldArgs := os.Args
 	os.Args = []string{
-		os.Args[0],
-		"-port", "9090",
-		"-domain", "https://example.com",
-		"-token", "test-token",
-		"-debug",
+		"cmd",
+		"-port=",
+		"-domain=",
 	}
+
+	defer func() {
+		os.Args = oldArgs
+		resetFlags()
+		clearEnv()
+	}()
 
 	config := configParser.Parse()
 
-	// 验证命令行参数是否正确解析
-	if config.Port != "9090" {
-		t.Errorf("Expected port to be 9090, got %s", config.Port)
+	if config.Port != "8080" {
+		t.Errorf("空 Port 应该使用默认值 8080，实际为 %s", config.Port)
 	}
-	if config.Domain != "https://example.com" {
-		t.Errorf("Expected domain to be https://example.com, got %s", config.Domain)
-	}
-	if config.Token != "test-token" {
-		t.Errorf("Expected token to be test-token, got %s", config.Token)
-	}
-	if !config.Debug {
-		t.Error("Expected debug to be true, got false")
+
+	if config.Domain != "http://localhost:8080" {
+		t.Errorf("空 Domain 应该使用默认值 http://localhost:8080，实际为 %s", config.Domain)
 	}
 }
 
-// TestParseEnvironment 测试环境变量解析
-func TestParseEnvironment(t *testing.T) {
-	cleanEnv()
-	oldArgs := cleanArgs()
-	defer restoreArgs(oldArgs)
-	resetFlags()
+func TestParseCommandLineArgs(t *testing.T) {
+	oldArgs := os.Args
+	os.Args = []string{
+		"cmd",
+		"-debug=true",
+		"-port=9090",
+		"-domain=https://example.com",
+		"-token=test-token",
+	}
 
-	// 设置环境变量
-	os.Setenv("SERVER_PORT", "7070")
-	os.Setenv("SERVER_DOMAIN", "https://test.com")
-	os.Setenv("TOKEN", "env-token")
-	os.Setenv("DEBUG", "true")
+	defer func() {
+		os.Args = oldArgs
+		resetFlags()
+		clearEnv()
+	}()
 
 	config := configParser.Parse()
 
-	// 验证环境变量是否正确解析
+	if !config.Debug {
+		t.Error("Debug 应该为 true")
+	}
+
+	if config.Port != "9090" {
+		t.Errorf("Port 应该为 9090，实际为 %s", config.Port)
+	}
+
+	if config.Domain != "https://example.com" {
+		t.Errorf("Domain 应该为 https://example.com，实际为 %s", config.Domain)
+	}
+
+	if config.Token != "test-token" {
+		t.Errorf("Token 应该为 test-token，实际为 %s", config.Token)
+	}
+}
+
+func TestParseEnvironmentVars(t *testing.T) {
+	oldArgs := os.Args
+	os.Args = []string{"cmd"}
+
+	defer func() {
+		os.Args = oldArgs
+		resetFlags()
+		clearEnv()
+	}()
+
+	os.Setenv("DEBUG", "true")
+	os.Setenv("SERVER_PORT", "7070")
+	os.Setenv("SERVER_DOMAIN", "https://env-example.com")
+	os.Setenv("TOKEN", "env-token")
+
+	config := configParser.Parse()
+
+	if !config.Debug {
+		t.Error("Debug 应该为 true")
+	}
+
 	if config.Port != "7070" {
-		t.Errorf("Expected port to be 7070, got %s", config.Port)
+		t.Errorf("Port 应该为 7070，实际为 %s", config.Port)
 	}
-	if config.Domain != "https://test.com" {
-		t.Errorf("Expected domain to be https://test.com, got %s", config.Domain)
+
+	if config.Domain != "https://env-example.com" {
+		t.Errorf("Domain 应该为 https://env-example.com，实际为 %s", config.Domain)
 	}
+
 	if config.Token != "env-token" {
-		t.Errorf("Expected token to be env-token, got %s", config.Token)
-	}
-	if !config.Debug {
-		t.Error("Expected debug to be true, got false")
+		t.Errorf("Token 应该为 env-token，实际为 %s", config.Token)
 	}
 }
 
-// TestParsePriority 测试参数优先级：命令行参数 > 环境变量 > 默认值
-func TestParsePriority(t *testing.T) {
-	cleanEnv()
-	oldArgs := cleanArgs()
-	defer restoreArgs(oldArgs)
-	resetFlags()
+func TestEnvironmentDebugCaseInsensitive(t *testing.T) {
+	t.Run("DEBUG=TRUE", func(t *testing.T) {
+		oldArgs := os.Args
+		os.Args = []string{"cmd"}
 
-	// 设置环境变量
-	os.Setenv("SERVER_PORT", "7070")
-	os.Setenv("SERVER_DOMAIN", "https://test.com")
-	os.Setenv("TOKEN", "env-token")
-	os.Setenv("DEBUG", "true")
+		defer func() {
+			os.Args = oldArgs
+			resetFlags()
+			clearEnv()
+		}()
 
-	// 设置命令行参数
-	os.Args = []string{
-		os.Args[0],
-		"-port", "9090",
-		"-domain", "https://example.com",
-		"-token", "test-token",
-		"-debug", "false",
+		os.Setenv("DEBUG", "TRUE")
+		config := configParser.Parse()
+		if !config.Debug {
+			t.Error("DEBUG=TRUE 应该设置 Debug 为 true")
+		}
+	})
+
+	t.Run("DEBUG=True", func(t *testing.T) {
+		oldArgs := os.Args
+		os.Args = []string{"cmd"}
+
+		defer func() {
+			os.Args = oldArgs
+			resetFlags()
+			clearEnv()
+		}()
+
+		os.Setenv("DEBUG", "True")
+		config := configParser.Parse()
+		if !config.Debug {
+			t.Error("DEBUG=True 应该设置 Debug 为 true")
+		}
+	})
+}
+
+func TestLogOutput(t *testing.T) {
+	oldArgs := os.Args
+
+	defer func() {
+		os.Args = oldArgs
+		resetFlags()
+		clearEnv()
+	}()
+
+	// 测试 Debug 日志
+	os.Args = []string{"cmd", "-debug=true"}
+	output := captureLog(func() {
+		configParser.Parse()
+	})
+	if !strings.Contains(output, "调试模式已开启") {
+		t.Error("应该输出调试模式开启的日志")
 	}
+
+	// 测试 Token 提醒日志
+	resetFlags()
+	clearEnv()
+	os.Args = []string{"cmd"}
+	output = captureLog(func() {
+		configParser.Parse()
+	})
+	if !strings.Contains(output, "TOKEN") {
+		t.Error("应该输出 Token 提醒的日志")
+	}
+}
+
+func TestPriorityOrder(t *testing.T) {
+	oldArgs := os.Args
+	os.Args = []string{
+		"cmd",
+		"-debug=true",
+		"-port=9090",
+	}
+
+	defer func() {
+		os.Args = oldArgs
+		resetFlags()
+		clearEnv()
+	}()
+
+	os.Setenv("DEBUG", "false")
+	os.Setenv("SERVER_PORT", "7070")
 
 	config := configParser.Parse()
 
-	// 验证优先级：应该使用命令行参数的值
+	if !config.Debug {
+		t.Error("命令行参数 Debug=true 应该覆盖环境变量")
+	}
+
 	if config.Port != "9090" {
-		t.Errorf("Expected port to be 9090 (command line), got %s", config.Port)
+		t.Errorf("命令行参数 Port=9090 应该覆盖环境变量，实际为 %s", config.Port)
 	}
-	if config.Domain != "https://example.com" {
-		t.Errorf("Expected domain to be https://example.com (command line), got %s", config.Domain)
+}
+
+func TestEmptyEnvironmentVars(t *testing.T) {
+	oldArgs := os.Args
+	os.Args = []string{"cmd"}
+
+	defer func() {
+		os.Args = oldArgs
+		resetFlags()
+		clearEnv()
+	}()
+
+	os.Setenv("SERVER_PORT", "")
+	os.Setenv("SERVER_DOMAIN", "")
+	os.Setenv("TOKEN", "")
+
+	config := configParser.Parse()
+
+	if config.Port != "8080" {
+		t.Errorf("空环境变量 SERVER_PORT 应该使用默认值 8080，实际为 %s", config.Port)
 	}
-	if config.Token != "test-token" {
-		t.Errorf("Expected token to be test-token (command line), got %s", config.Token)
+
+	if config.Domain != "http://localhost:8080" {
+		t.Errorf("空环境变量 SERVER_DOMAIN 应该使用默认值 http://localhost:8080，实际为 %s", config.Domain)
 	}
-	if config.Debug {
-		t.Error("Expected debug to be false (command line), got true")
+
+	if config.Token != "" {
+		t.Errorf("空环境变量 TOKEN 应该为空字符串，实际为 %s", config.Token)
 	}
 }
