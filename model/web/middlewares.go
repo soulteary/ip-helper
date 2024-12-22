@@ -40,11 +40,9 @@ func IPAnalyzerMiddleware() gin.HandlerFunc {
 func CacheMiddleware() gin.HandlerFunc {
 	data := []byte(time.Now().String())
 	etag := fmt.Sprintf("W/%x", md5.Sum(data))
-
 	return func(c *gin.Context) {
 		if strings.HasPrefix(c.Request.URL.Path, "/") {
 			c.Header("Cache-Control", "private, max-age=86400")
-
 			if match := c.GetHeader("If-None-Match"); match != "" {
 				if strings.Contains(match, etag) {
 					c.Status(http.StatusNotModified)

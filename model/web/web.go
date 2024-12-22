@@ -18,6 +18,18 @@ type IPForm struct {
 	IP string `form:"ip" binding:"required"`
 }
 
+func GetClientIPInfo(c *gin.Context, ipaddr string, ipdb *ipInfo.IPDB) (resultIP string, resultDBInfo []string, err error) {
+	if ipaddr == "" {
+		info, exists := c.Get("ip_info")
+		if !exists {
+			return resultIP, resultDBInfo, fmt.Errorf("IP info not found")
+		}
+		ipaddr = info.(ipInfo.Info).RealIP
+	}
+	dbInfo := ipdb.FindByIPIP(ipaddr)
+	return ipaddr, dbInfo, nil
+}
+
 func Server(config *define.Config, ipdb *ipInfo.IPDB) {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
@@ -32,24 +44,9 @@ func Server(config *define.Config, ipdb *ipInfo.IPDB) {
 	})
 
 	r.Use(CacheMiddleware())
-
 	r.Use(static.Serve("/", static.LocalFile("./public", false)))
-
 	r.Use(AuthMiddleware(config))
 	r.Use(IPAnalyzerMiddleware())
-
-	getClientIPInfo := func(c *gin.Context, ipaddr string) (resultIP string, resultDBInfo []string, err error) {
-		if ipaddr == "" {
-			info, exists := c.Get("ip_info")
-			if !exists {
-				return resultIP, resultDBInfo, fmt.Errorf("IP info not found")
-			}
-			ipaddr = info.(ipInfo.Info).RealIP
-		}
-
-		dbInfo := ipdb.FindByIPIP(ipaddr)
-		return ipaddr, dbInfo, nil
-	}
 
 	globalTemplate := []byte{}
 	err := error(nil)
@@ -63,7 +60,7 @@ func Server(config *define.Config, ipdb *ipInfo.IPDB) {
 			}
 		}
 
-		ipAddr, dbInfo, err := getClientIPInfo(c, "")
+		ipAddr, dbInfo, err := GetClientIPInfo(c, "", ipdb)
 		if err != nil {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
@@ -107,7 +104,7 @@ func Server(config *define.Config, ipdb *ipInfo.IPDB) {
 
 	r.GET("/ip/:ip", func(c *gin.Context) {
 		ip := c.Param("ip")
-		ipAddr, dbInfo, err := getClientIPInfo(c, ip)
+		ipAddr, dbInfo, err := GetClientIPInfo(c, ip, ipdb)
 		if err != nil {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
