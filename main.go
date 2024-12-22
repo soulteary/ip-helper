@@ -18,6 +18,7 @@ import (
 	"github.com/gin-gonic/gin"
 	static "github.com/soulteary/gin-static"
 	"github.com/soulteary/ip-helper/model/define"
+	fn "github.com/soulteary/ip-helper/model/fn"
 	configParser "github.com/soulteary/ip-helper/model/parse-config"
 	"github.com/soulteary/ipdb-go"
 )
@@ -100,76 +101,11 @@ func analyzeIP(c *gin.Context) IPInfo {
 		ipInfo.RealIP = xRealIP
 	}
 
-	if isPrivateIP(ipInfo.ClientIP) {
+	if fn.IsPrivateIP(ipInfo.ClientIP) {
 		ipInfo.IsProxy = true
 	}
 
 	return ipInfo
-}
-
-func isPrivateIP(ipStr string) bool {
-	ip := net.ParseIP(ipStr)
-	if ip == nil {
-		return false
-	}
-
-	privateIPRanges := []struct {
-		start net.IP
-		end   net.IP
-	}{
-		{net.ParseIP("10.0.0.0"), net.ParseIP("10.255.255.255")},
-		{net.ParseIP("172.16.0.0"), net.ParseIP("172.31.255.255")},
-		{net.ParseIP("192.168.0.0"), net.ParseIP("192.168.255.255")},
-	}
-
-	for _, r := range privateIPRanges {
-		if bytes.Compare(ip, r.start) >= 0 && bytes.Compare(ip, r.end) <= 0 {
-			return true
-		}
-	}
-	return false
-}
-
-func removeDuplicates(strSlice []string) []string {
-	encountered := make(map[string]bool)
-	result := []string{}
-
-	for _, str := range strSlice {
-		if !encountered[str] {
-			encountered[str] = true
-			result = append(result, str)
-		}
-	}
-	return result
-}
-
-func isValidIPAddress(ip string) bool {
-	if parsedIP := net.ParseIP(ip); parsedIP != nil {
-		return true
-	}
-	return false
-}
-
-func IsDownloadTool(userAgent string) bool {
-	ua := strings.ToLower(userAgent)
-
-	downloadTools := []string{
-		"curl",
-		"wget",
-		"aria2",
-		"python-requests",
-		"axios",
-		"got",
-		"postman",
-	}
-
-	for _, tool := range downloadTools {
-		if strings.Contains(ua, tool) {
-			return true
-		}
-	}
-
-	return false
 }
 
 func cacheMiddleware() gin.HandlerFunc {
@@ -305,7 +241,7 @@ func (db IPDB) FindByIPIP(ip string) []string {
 	if err != nil {
 		info = []string{"未找到 IP 地址信息"}
 	}
-	return removeDuplicates(info)
+	return fn.RemoveDuplicates(info)
 }
 
 func GetDomainOnly(urlStr string) string {
@@ -382,7 +318,7 @@ func main() {
 	renderTemplate := func(c *gin.Context, globalTemplate []byte, ipaddr string, dbInfo []string) []byte {
 		template := bytes.ReplaceAll(globalTemplate, []byte("%IP_ADDR%"), []byte(ipaddr))
 		template = bytes.ReplaceAll(template, []byte("%DOMAIN%"), []byte(config.Domain))
-		template = bytes.ReplaceAll(template, []byte("%DATA_1_INFO%"), []byte(strings.Join(removeDuplicates(dbInfo), " ")))
+		template = bytes.ReplaceAll(template, []byte("%DATA_1_INFO%"), []byte(strings.Join(fn.RemoveDuplicates(dbInfo), " ")))
 		template = bytes.ReplaceAll(template, []byte("%DOCUMENT_PATH%"), []byte(c.Request.URL.Path))
 		template = bytes.ReplaceAll(template, []byte("%ONLY_DOMAIN%"), []byte(GetDomainOnly(config.Domain)))
 		template = bytes.ReplaceAll(template, []byte("%ONLY_DOMAIN_WITH_PORT%"), []byte(GetDomainWithPort(config.Domain)))
@@ -408,7 +344,7 @@ func main() {
 		}
 
 		userAgent := c.GetHeader("User-Agent")
-		if IsDownloadTool(userAgent) {
+		if fn.IsDownloadTool(userAgent) {
 			c.JSON(200, renderJSON(ipAddr, dbInfo))
 		} else {
 			c.Data(200, "text/html; charset=utf-8", renderTemplate(c, globalTemplate, ipAddr, dbInfo))
@@ -427,7 +363,7 @@ func main() {
 			ip = ipInfo.(IPInfo).RealIP
 		} else {
 			ip = form.IP
-			if !isValidIPAddress(ip) {
+			if !fn.IsValidIPAddress(ip) {
 				ip = ipInfo.(IPInfo).RealIP
 			}
 		}
@@ -452,7 +388,7 @@ func main() {
 		}
 
 		userAgent := c.GetHeader("User-Agent")
-		if IsDownloadTool(userAgent) {
+		if fn.IsDownloadTool(userAgent) {
 			c.JSON(200, renderJSON(ipAddr, dbInfo))
 		} else {
 			c.Data(200, "text/html; charset=utf-8", renderTemplate(c, globalTemplate, ipAddr, dbInfo))
