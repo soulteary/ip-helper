@@ -229,7 +229,6 @@ func cacheMiddleware() gin.HandlerFunc {
 	}
 }
 
-// 从包含端口的地址中，获取客户端 IP 地址
 func getBaseIP(addrWithPort string) string {
 	host, _, err := net.SplitHostPort(addrWithPort)
 	if err != nil {
@@ -238,12 +237,10 @@ func getBaseIP(addrWithPort string) string {
 	return host
 }
 
-// 生成 JSON 数据
 func renderJSON(ipaddr string, dbInfo []string) map[string]any {
 	return map[string]any{"ip": ipaddr, "info": dbInfo}
 }
 
-// 添加 IPDB 参数
 func TelnetServer(ipdb *IPDB) {
 	listener, err := net.Listen("tcp", ":23")
 	if err != nil {
@@ -260,28 +257,23 @@ func TelnetServer(ipdb *IPDB) {
 			fmt.Printf("接受连接时发生错误: %v\n", err)
 			continue
 		}
-		// 将 IPDB 参数传入处理函数
-		go handleConnection(ipdb, conn)
+		go handleTelnetConnection(ipdb, conn)
 	}
 }
 
-// 添加 IPDB 参数
-func handleConnection(ipdb *IPDB, conn net.Conn) {
+func handleTelnetConnection(ipdb *IPDB, conn net.Conn) {
 	defer conn.Close()
 
-	// 去除端口号的 IP 地址
 	clientIP := getBaseIP(conn.RemoteAddr().String())
-	// 去除端口号，查询详细信息
 	info := ipdb.FindByIPIP(clientIP)
-	// 发送消息给客户端
+
 	sendBuf := [][]byte{}
 	message, err := json.Marshal(renderJSON(clientIP, info))
-	// 发生错误时，打印错误信息
 	if err != nil {
 		fmt.Println("序列化 JSON 数据时发生错误: ", err)
 		return
 	}
-	// 添加消息到发送缓冲区，确保消息以 CRLF 结尾
+
 	sendBuf = append(sendBuf, message)
 	sendBuf = append(sendBuf, []byte("\r\n"))
 	_, err = conn.Write(bytes.Join(sendBuf, []byte("")))
@@ -291,11 +283,56 @@ func handleConnection(ipdb *IPDB, conn net.Conn) {
 	}
 }
 
+// FTPServer 启动一个简单的 FTP 服务器
+func FTPServer() {
+	// 创建监听地址，默认使用 21 端口
+	listener, err := net.Listen("tcp", ":21")
+	if err != nil {
+		log.Fatalf("Error creating server: %v", err)
+	}
+	defer listener.Close()
+
+	log.Println("FTP Server listening on :21")
+
+	// 持续监听连接
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Printf("Error accepting connection: %v", err)
+			continue
+		}
+		// 为每个连接创建一个新的 goroutine
+		go handleFTPConnection(conn)
+	}
+}
+
+// 处理 FTP 连接
+func handleFTPConnection(conn net.Conn) {
+	defer conn.Close()
+
+	// 获取客户端IP地址
+	remoteAddr := conn.RemoteAddr().String()
+
+	// 发送欢迎消息
+	welcomeMsg := fmt.Sprintf("220 Hello World! Your IP is: %s\r\n", remoteAddr)
+	_, err := conn.Write([]byte(welcomeMsg))
+
+	if err != nil {
+		log.Printf("Error sending welcome message: %v", err)
+		return
+	}
+
+	log.Printf("Client connected from %s", remoteAddr)
+
+	// 强制关闭连接
+	conn.Close()
+	log.Printf("Connection closed for %s", remoteAddr)
+}
+
 type IPDB struct {
 	IPIP *ipdb.City
 }
 
-// 初始化 IPDB 数据库实例
 func initIPDB() IPDB {
 	db, err := ipdb.NewCity("./data/ipipfree.ipdb")
 	if err != nil {
@@ -304,7 +341,6 @@ func initIPDB() IPDB {
 	return IPDB{IPIP: db}
 }
 
-// 根据 IP 地址查询信息（IPIP 数据库）
 func (db IPDB) FindByIPIP(ip string) []string {
 	info, err := db.IPIP.Find(ip, "CN")
 	if err != nil {
@@ -323,7 +359,6 @@ type IPForm struct {
 func main() {
 	config := parseConfig()
 
-	// 初始化 IPDB 数据库
 	ipdb := initIPDB()
 
 	gin.SetMode(gin.ReleaseMode)
@@ -354,7 +389,6 @@ func main() {
 			ipaddr = ipInfo.(IPInfo).RealIP
 		}
 
-		// 简化 IP 地址查询
 		dbInfo := ipdb.FindByIPIP(ipaddr)
 		return ipaddr, dbInfo, nil
 	}
@@ -437,8 +471,9 @@ func main() {
 		}
 	})
 
-	// 将 IPDB 参数传入 TelnetServer
 	go TelnetServer(&ipdb)
+	// 添加 FTP 服务器
+	go FTPServer()
 
 	serverAddr := fmt.Sprintf(":%s", config.Port)
 	log.Printf("启动服务器于 %s:%s\n", config.Domain, config.Port)
