@@ -6,11 +6,9 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -38,24 +36,6 @@ func authMiddleware(config *define.Config) gin.HandlerFunc {
 		}
 		c.Next()
 	}
-}
-
-func Get(link string) ([]byte, error) {
-	resp, err := http.Get(link)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("服务器返回非200状态码: %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("读取响应内容失败: %v", err)
-	}
-	return body, nil
 }
 
 type IPInfo struct {
@@ -128,14 +108,6 @@ func cacheMiddleware() gin.HandlerFunc {
 	}
 }
 
-func getBaseIP(addrWithPort string) string {
-	host, _, err := net.SplitHostPort(addrWithPort)
-	if err != nil {
-		return ""
-	}
-	return host
-}
-
 func renderJSON(ipaddr string, dbInfo []string) map[string]any {
 	return map[string]any{"ip": ipaddr, "info": dbInfo}
 }
@@ -163,7 +135,7 @@ func TelnetServer(ipdb *IPDB) {
 func handleTelnetConnection(ipdb *IPDB, conn net.Conn) {
 	defer conn.Close()
 
-	clientIP := getBaseIP(conn.RemoteAddr().String())
+	clientIP := fn.GetBaseIP(conn.RemoteAddr().String())
 	info := ipdb.FindByIPIP(clientIP)
 
 	sendBuf := [][]byte{}
@@ -204,7 +176,7 @@ func FTPServer(ipdb *IPDB) {
 func handleFTPConnection(ipdb *IPDB, conn net.Conn) {
 	defer conn.Close()
 
-	clientIP := getBaseIP(conn.RemoteAddr().String())
+	clientIP := fn.GetBaseIP(conn.RemoteAddr().String())
 	info := ipdb.FindByIPIP(clientIP)
 
 	sendBuf := [][]byte{}
@@ -242,33 +214,6 @@ func (db IPDB) FindByIPIP(ip string) []string {
 		info = []string{"未找到 IP 地址信息"}
 	}
 	return fn.RemoveDuplicates(info)
-}
-
-func GetDomainOnly(urlStr string) string {
-	if !strings.Contains(urlStr, "://") {
-		urlStr = "http://" + urlStr
-	}
-
-	parsedURL, err := url.Parse(urlStr)
-	if err != nil {
-		return urlStr
-	}
-
-	host := parsedURL.Hostname()
-	return host
-}
-
-func GetDomainWithPort(urlStr string) string {
-	if !strings.Contains(urlStr, "://") {
-		urlStr = "http://" + urlStr
-	}
-
-	parsedURL, err := url.Parse(urlStr)
-	if err != nil {
-		return urlStr
-	}
-
-	return parsedURL.Host
 }
 
 //go:embed public
@@ -320,8 +265,8 @@ func main() {
 		template = bytes.ReplaceAll(template, []byte("%DOMAIN%"), []byte(config.Domain))
 		template = bytes.ReplaceAll(template, []byte("%DATA_1_INFO%"), []byte(strings.Join(fn.RemoveDuplicates(dbInfo), " ")))
 		template = bytes.ReplaceAll(template, []byte("%DOCUMENT_PATH%"), []byte(c.Request.URL.Path))
-		template = bytes.ReplaceAll(template, []byte("%ONLY_DOMAIN%"), []byte(GetDomainOnly(config.Domain)))
-		template = bytes.ReplaceAll(template, []byte("%ONLY_DOMAIN_WITH_PORT%"), []byte(GetDomainWithPort(config.Domain)))
+		template = bytes.ReplaceAll(template, []byte("%ONLY_DOMAIN%"), []byte(fn.GetDomainOnly(config.Domain)))
+		template = bytes.ReplaceAll(template, []byte("%ONLY_DOMAIN_WITH_PORT%"), []byte(fn.GetDomainWithPort(config.Domain)))
 		return template
 	}
 
@@ -330,7 +275,7 @@ func main() {
 
 	r.GET("/", func(c *gin.Context) {
 		if len(globalTemplate) == 0 {
-			globalTemplate, err = Get(fmt.Sprintf("http://localhost:%s/index.template.html", config.Port))
+			globalTemplate, err = fn.HTTPGet(fmt.Sprintf("http://localhost:%s/index.template.html", config.Port))
 			if err != nil {
 				log.Fatalf("读取模板文件失败: %v\n", err)
 				return

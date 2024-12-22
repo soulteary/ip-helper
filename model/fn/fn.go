@@ -2,7 +2,11 @@ package fn
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 	"net"
+	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -69,4 +73,57 @@ func IsDownloadTool(userAgent string) bool {
 	}
 
 	return false
+}
+
+func GetDomainOnly(urlStr string) string {
+	if !strings.Contains(urlStr, "://") {
+		urlStr = "http://" + urlStr
+	}
+
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return urlStr
+	}
+
+	host := parsedURL.Hostname()
+	return host
+}
+
+func GetDomainWithPort(urlStr string) string {
+	if !strings.Contains(urlStr, "://") {
+		urlStr = "http://" + urlStr
+	}
+
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return urlStr
+	}
+
+	return parsedURL.Host
+}
+
+func GetBaseIP(addrWithPort string) string {
+	host, _, err := net.SplitHostPort(addrWithPort)
+	if err != nil {
+		return ""
+	}
+	return host
+}
+
+func HTTPGet(link string) ([]byte, error) {
+	resp, err := http.Get(link)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("服务器返回非200状态码: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("读取响应内容失败: %v", err)
+	}
+	return body, nil
 }
