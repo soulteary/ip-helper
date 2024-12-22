@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1"> 
     <title>IP Query</title>
     <meta name="description" content="IP Query Tools, open-source project https://github.com/soulteary/ip-helper">
-    <link rel="canonical" href="http://%DOMAIN%%DOCUMENT_PATH%"/>
+    <link rel="canonical" href="%DOMAIN%%DOCUMENT_PATH%"/>
     <base href="/">
     <style>
       * {
@@ -185,7 +185,7 @@
           </div>
           <div class="result-row">
             <div class="result-label">URL</div>
-            <div class="result-value">http://%DOMAIN%/%IP_ADDR%</div>
+            <div class="result-value">%DOMAIN%/%IP_ADDR%</div>
           </div>
         </div>
 
@@ -197,7 +197,7 @@
             </div>
             <div class="command-code">
               <span class="command-prompt">#</span>
-              <input id="command-curl" type="text" value="curl %DOMAIN%" />
+              <input id="command-curl" type="text" value="curl %ONLY_DOMAIN_WITH_PORT%" />
             </div>
           </div>
           <div class="command-row">
@@ -206,7 +206,7 @@
             </div>
             <div class="command-code">
               <span class="command-prompt">></span>
-              <input id="command-telenet" type="text" value="telnet %DOMAIN%" />
+              <input id="command-telenet" type="text" value="telnet %ONLY_DOMAIN%" />
             </div>
           </div>
           <div class="command-row">
@@ -215,7 +215,7 @@
             </div>
             <div class="command-code">
               <span class="command-prompt">></span>
-              <input id="command-ftp" type="text" value="ftp %DOMAIN%" />
+              <input id="command-ftp" type="text" value="ftp %ONLY_DOMAIN%" />
             </div>
           </div>
 
@@ -226,7 +226,7 @@
             </div>
             <div class="command-code">
               <span class="command-prompt">#</span>
-              <input id="command-curl-ip-only" type="text" value="curl %DOMAIN%/ip" />
+              <input id="command-curl-ip-only" type="text" value="curl %ONLY_DOMAIN_WITH_PORT%/ip" />
             </div>
           </div>
         </div>

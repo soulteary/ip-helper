@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -283,7 +284,6 @@ func handleTelnetConnection(ipdb *IPDB, conn net.Conn) {
 	}
 }
 
-// 增加 IPDB 参数
 func FTPServer(ipdb *IPDB) {
 	listener, err := net.Listen("tcp", ":21")
 	if err != nil {
@@ -303,15 +303,12 @@ func FTPServer(ipdb *IPDB) {
 	}
 }
 
-// 增加 IPDB 参数
 func handleFTPConnection(ipdb *IPDB, conn net.Conn) {
 	defer conn.Close()
 
-	// 获取客户端IP地址
 	clientIP := getBaseIP(conn.RemoteAddr().String())
 	info := ipdb.FindByIPIP(clientIP)
 
-	// 将 IP 地址信息发送给客户端
 	sendBuf := [][]byte{}
 	message, err := json.Marshal(renderJSON(clientIP, info))
 	if err != nil {
@@ -347,6 +344,39 @@ func (db IPDB) FindByIPIP(ip string) []string {
 		info = []string{"未找到 IP 地址信息"}
 	}
 	return removeDuplicates(info)
+}
+
+// GetDomainOnly 返回 URL 中的域名部分，不包含端口号和路径
+func GetDomainOnly(urlStr string) string {
+	// 如果 URL 不包含协议，添加临时协议以便解析
+	if !strings.Contains(urlStr, "://") {
+		urlStr = "http://" + urlStr
+	}
+
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return urlStr
+	}
+
+	// 返回 Host 中的域名部分（去掉端口号）
+	host := parsedURL.Hostname()
+	return host
+}
+
+// GetDomainWithPort 返回URL中的域名和端口号（如果存在），不包含路径
+func GetDomainWithPort(urlStr string) string {
+	// 如果 URL 不包含协议，添加临时协议以便解析
+	if !strings.Contains(urlStr, "://") {
+		urlStr = "http://" + urlStr
+	}
+
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return urlStr
+	}
+
+	// 返回完整的 Host 部分（包含域名和端口号）
+	return parsedURL.Host
 }
 
 //go:embed public
@@ -398,6 +428,9 @@ func main() {
 		template = bytes.ReplaceAll(template, []byte("%DOMAIN%"), []byte(config.Domain))
 		template = bytes.ReplaceAll(template, []byte("%DATA_1_INFO%"), []byte(strings.Join(removeDuplicates(dbInfo), " ")))
 		template = bytes.ReplaceAll(template, []byte("%DOCUMENT_PATH%"), []byte(c.Request.URL.Path))
+		// 更新模板中的占位符
+		template = bytes.ReplaceAll(template, []byte("%ONLY_DOMAIN%"), []byte(GetDomainOnly(config.Domain)))
+		template = bytes.ReplaceAll(template, []byte("%ONLY_DOMAIN_WITH_PORT%"), []byte(GetDomainWithPort(config.Domain)))
 		return template
 	}
 
