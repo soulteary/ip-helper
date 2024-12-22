@@ -243,6 +243,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	r.Use(gin.Recovery())
 	r.Use(gzip.Gzip(gzip.BestCompression))
@@ -360,7 +361,7 @@ func main() {
 	})
 
 	serverAddr := fmt.Sprintf(":%s", config.Port)
-	log.Printf("启动服务器于 %s:%s\n", "config.Domain", config.Port)
+	log.Printf("启动服务器于 %s:%s\n", config.Domain, config.Port)
 	if err := r.Run(serverAddr); err != nil {
 		log.Fatalf("启动服务器失败: %v", err)
 	}
