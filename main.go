@@ -5,62 +5,24 @@ import (
 	"crypto/md5"
 	"embed"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	static "github.com/soulteary/gin-static"
+	"github.com/soulteary/ip-helper/model/define"
+	configParser "github.com/soulteary/ip-helper/model/parse-config"
 	"github.com/soulteary/ipdb-go"
 )
 
-type Config struct {
-	Domain string
-	Port   string
-	Token  string
-}
-
-func parseConfig() *Config {
-	config := &Config{}
-
-	flag.StringVar(&config.Port, "port", "", "服务器端口")
-	flag.StringVar(&config.Domain, "domain", "", "服务器域名")
-	flag.StringVar(&config.Token, "token", "", "API 访问令牌")
-	flag.Parse()
-
-	if config.Port == "" {
-		config.Port = os.Getenv("SERVER_PORT")
-	}
-	if config.Domain == "" {
-		config.Domain = os.Getenv("SERVER_DOMAIN")
-	}
-	if config.Token == "" {
-		config.Token = os.Getenv("TOKEN")
-	}
-
-	if config.Port == "" {
-		config.Port = "8080"
-	}
-	if config.Domain == "" {
-		config.Domain = "http://localhost:8080"
-	}
-	if config.Token == "" {
-		config.Token = ""
-		log.Println("提醒：为了提高安全性，可以设置 `TOKEN` 环境变量或 `token` 命令行参数")
-	}
-
-	return config
-}
-
-func authMiddleware(config *Config) gin.HandlerFunc {
+func authMiddleware(config *define.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if config.Token != "" {
 			token := c.Query("token")
@@ -381,7 +343,7 @@ type IPForm struct {
 }
 
 func main() {
-	config := parseConfig()
+	config := configParser.Parse()
 
 	ipdb := initIPDB()
 
@@ -478,7 +440,6 @@ func main() {
 			c.JSON(500, gin.H{"error": "IP info not found"})
 			return
 		}
-		// 仅返回客户端 IP 地址
 		c.String(200, ipInfo.(IPInfo).ClientIP)
 	})
 
