@@ -1,7 +1,7 @@
 package response_test
 
 import (
-	"reflect"
+	"encoding/json"
 	"testing"
 
 	"github.com/soulteary/ip-helper/model/define"
@@ -16,30 +16,30 @@ func TestRenderJSON(t *testing.T) {
 		expected map[string]any
 	}{
 		{
-			name:   "basic test",
-			ipaddr: "127.0.0.1",
-			dbInfo: []string{"info1", "info2"},
-			expected: map[string]any{
-				"ip":   "127.0.0.1",
-				"info": []string{"info1", "info2"},
-			},
-		},
-		{
-			name:   "empty dbInfo",
+			name:   "Normal IP with single info",
 			ipaddr: "192.168.1.1",
-			dbInfo: []string{},
+			dbInfo: []string{"Location: New York"},
 			expected: map[string]any{
 				"ip":   "192.168.1.1",
-				"info": []string{},
+				"info": []string{"Location: New York"},
 			},
 		},
 		{
-			name:   "empty ipaddr",
+			name:   "IP with multiple info entries",
+			ipaddr: "10.0.0.1",
+			dbInfo: []string{"Country: US", "City: San Francisco", "ISP: Example"},
+			expected: map[string]any{
+				"ip":   "10.0.0.1",
+				"info": []string{"Country: US", "City: San Francisco", "ISP: Example"},
+			},
+		},
+		{
+			name:   "Empty IP with empty info",
 			ipaddr: "",
-			dbInfo: []string{"test"},
+			dbInfo: []string{},
 			expected: map[string]any{
 				"ip":   "",
-				"info": []string{"test"},
+				"info": []string{},
 			},
 		},
 	}
@@ -47,8 +47,33 @@ func TestRenderJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := response.RenderJSON(tt.ipaddr, tt.dbInfo)
-			if !reflect.DeepEqual(result, tt.expected) {
-				t.Errorf("RenderJSON() = %v, want %v", result, tt.expected)
+
+			// Parse the JSON result back into a map for comparison
+			var got map[string]any
+			if err := json.Unmarshal(result, &got); err != nil {
+				t.Fatalf("Failed to unmarshal result JSON: %v", err)
+			}
+
+			// Compare the IP field
+			if got["ip"] != tt.expected["ip"] {
+				t.Errorf("IP mismatch - got: %v, want: %v", got["ip"], tt.expected["ip"])
+			}
+
+			// Compare the info array
+			gotInfo, ok := got["info"].([]any)
+			if !ok {
+				t.Fatal("Info field is not an array")
+			}
+
+			expectedInfo := tt.expected["info"].([]string)
+			if len(gotInfo) != len(expectedInfo) {
+				t.Errorf("Info array length mismatch - got: %d, want: %d", len(gotInfo), len(expectedInfo))
+			}
+
+			for i, v := range gotInfo {
+				if v != expectedInfo[i] {
+					t.Errorf("Info[%d] mismatch - got: %v, want: %v", i, v, expectedInfo[i])
+				}
 			}
 		})
 	}

@@ -68,7 +68,7 @@ func Server(config *define.Config, ipdb *ipInfo.IPDB) {
 
 		userAgent := c.GetHeader("User-Agent")
 		if fn.IsDownloadTool(userAgent) {
-			c.JSON(200, response.RenderJSON(ipAddr, dbInfo))
+			c.Data(200, "application/json; charset=utf-8", response.RenderJSON(ipAddr, dbInfo))
 		} else {
 			c.Data(200, "text/html; charset=utf-8", response.RenderHTML(config, c.Request.URL.Path, globalTemplate, ipAddr, dbInfo))
 		}
@@ -112,7 +112,7 @@ func Server(config *define.Config, ipdb *ipInfo.IPDB) {
 
 		userAgent := c.GetHeader("User-Agent")
 		if fn.IsDownloadTool(userAgent) {
-			c.JSON(200, response.RenderJSON(ipAddr, dbInfo))
+			c.Data(200, "application/json; charset=utf-8", response.RenderJSON(ipAddr, dbInfo))
 		} else {
 			c.Data(200, "text/html; charset=utf-8", response.RenderHTML(config, c.Request.URL.Path, globalTemplate, ipAddr, dbInfo))
 		}

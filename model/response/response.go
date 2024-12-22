@@ -2,14 +2,16 @@ package response
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 
 	"github.com/soulteary/ip-helper/model/define"
 	"github.com/soulteary/ip-helper/model/fn"
 )
 
-func RenderJSON(ipaddr string, dbInfo []string) map[string]any {
-	return map[string]any{"ip": ipaddr, "info": dbInfo}
+func RenderJSON(ipaddr string, dbInfo []string) []byte {
+	response, _ := json.Marshal(map[string]any{"ip": ipaddr, "info": dbInfo})
+	return response
 }
 
 func RenderHTML(config *define.Config, urlPath string, globalTemplate []byte, ipaddr string, dbInfo []string) []byte {
