@@ -6,9 +6,9 @@ import (
 	"os"
 
 	"github.com/gin-contrib/gzip"
-	static "github.com/soulteary/gin-static"
-
 	"github.com/gin-gonic/gin"
+
+	static "github.com/soulteary/gin-static"
 	"github.com/soulteary/ip-helper/model/define"
 	"github.com/soulteary/ip-helper/model/fn"
 	ipInfo "github.com/soulteary/ip-helper/model/ip-info"
@@ -16,20 +16,43 @@ import (
 	"github.com/soulteary/ip-helper/model/response"
 )
 
-type IPForm struct {
-	IP string `form:"ip" binding:"required"`
-}
-
-func GetClientIPInfo(c *gin.Context, ipaddr string, ipdb *ipInfo.IPDB) (resultIP string, resultDBInfo []string, err error) {
-	if ipaddr == "" {
+func GetClientIP(c *gin.Context, ip string, ipdb *ipInfo.IPDB) (resultIP string, resultDBInfo []string, err error) {
+	if ip == "" {
 		info, exists := c.Get("ip_info")
 		if !exists {
 			return resultIP, resultDBInfo, fmt.Errorf("IP info not found")
 		}
-		ipaddr = info.(ipInfo.Info).RealIP
+		ip = info.(ipInfo.Info).RealIP
 	}
-	dbInfo := ipdb.FindByIPIP(ipaddr)
-	return ipaddr, dbInfo, nil
+	return ip, ipdb.FindByIPIP(ip), nil
+}
+
+func Response(c *gin.Context, config *define.Config, ipdb *ipInfo.IPDB, ip string, template []byte) {
+	err := error(nil)
+	if config.Debug {
+		template, err = fn.HTTPGet(fmt.Sprintf("http://localhost:%s/index.template.html", config.Port))
+		if err != nil {
+			log.Fatalf("读取模板文件失败: %v\n", err)
+			return
+		}
+	}
+
+	ipAddr, dbInfo, err := GetClientIP(c, ip, ipdb)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	userAgent := c.GetHeader("User-Agent")
+	if fn.IsDownloadTool(userAgent) {
+		c.Data(200, "application/json; charset=utf-8", response.RenderJSON(ipAddr, dbInfo))
+	} else {
+		c.Data(200, "text/html; charset=utf-8", response.RenderHTML(config, c.Request.URL.Path, template, ipAddr, dbInfo))
+	}
+}
+
+type IPForm struct {
+	IP string `form:"ip" binding:"required"`
 }
 
 func Server(config *define.Config, ipdb *ipInfo.IPDB) {
@@ -55,29 +78,8 @@ func Server(config *define.Config, ipdb *ipInfo.IPDB) {
 		os.WriteFile("./public/index.template.html", globalTemplate, 0644)
 	}
 
-	err := error(nil)
-
 	r.GET("/", func(c *gin.Context) {
-		if config.Debug {
-			globalTemplate, err = fn.HTTPGet(fmt.Sprintf("http://localhost:%s/index.template.html", config.Port))
-			if err != nil {
-				log.Fatalf("读取模板文件失败: %v\n", err)
-				return
-			}
-		}
-
-		ipAddr, dbInfo, err := GetClientIPInfo(c, "", ipdb)
-		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
-			return
-		}
-
-		userAgent := c.GetHeader("User-Agent")
-		if fn.IsDownloadTool(userAgent) {
-			c.Data(200, "application/json; charset=utf-8", response.RenderJSON(ipAddr, dbInfo))
-		} else {
-			c.Data(200, "text/html; charset=utf-8", response.RenderHTML(config, c.Request.URL.Path, globalTemplate, ipAddr, dbInfo))
-		}
+		Response(c, config, ipdb, "", globalTemplate)
 	})
 
 	r.POST("/", func(c *gin.Context) {
@@ -109,19 +111,7 @@ func Server(config *define.Config, ipdb *ipInfo.IPDB) {
 	})
 
 	r.GET("/ip/:ip", func(c *gin.Context) {
-		ip := c.Param("ip")
-		ipAddr, dbInfo, err := GetClientIPInfo(c, ip, ipdb)
-		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
-			return
-		}
-
-		userAgent := c.GetHeader("User-Agent")
-		if fn.IsDownloadTool(userAgent) {
-			c.Data(200, "application/json; charset=utf-8", response.RenderJSON(ipAddr, dbInfo))
-		} else {
-			c.Data(200, "text/html; charset=utf-8", response.RenderHTML(config, c.Request.URL.Path, globalTemplate, ipAddr, dbInfo))
-		}
+		Response(c, config, ipdb, c.Param("ip"), globalTemplate)
 	})
 
 	serverAddr := fmt.Sprintf(":%s", config.Port)
@@ -129,6 +119,4 @@ func Server(config *define.Config, ipdb *ipInfo.IPDB) {
 	if err := r.Run(serverAddr); err != nil {
 		log.Fatalf("WEB 服务器启动失败: %v", err)
 	}
-
-	r.Run(":8080")
 }
