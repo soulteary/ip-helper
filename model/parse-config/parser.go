@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/soulteary/ip-helper/model/define"
 )
@@ -17,8 +18,8 @@ func Parse() *define.Config {
 	flag.StringVar(&config.Token, "token", "", "API 访问令牌")
 	flag.Parse()
 
-	if config.Debug {
-		config.Debug = true
+	if !config.Debug {
+		config.Debug = strings.ToLower(os.Getenv("DEBUG")) == "true"
 	}
 	if config.Port == "" {
 		config.Port = os.Getenv("SERVER_PORT")

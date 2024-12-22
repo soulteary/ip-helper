@@ -125,9 +125,9 @@ func Server(config *define.Config, ipdb *ipInfo.IPDB) {
 	})
 
 	serverAddr := fmt.Sprintf(":%s", config.Port)
-	log.Printf("启动服务器于 %s:%s\n", config.Domain, config.Port)
+	log.Printf("WEB 启动服务器于 %s\n", config.Port)
 	if err := r.Run(serverAddr); err != nil {
-		log.Fatalf("启动服务器失败: %v", err)
+		log.Fatalf("WEB 服务器启动失败: %v", err)
 	}
 
 	r.Run(":8080")
