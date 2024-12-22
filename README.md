@@ -1,5 +1,7 @@
 # IP Helper
 
+![](.github/banner.jpg)
+
 一个简洁的、支持多协议查询 IP 信息的工具。
 
 ## 主要特性
@@ -26,10 +28,10 @@ TBD
 
 | 配置项 | 环境变量 | 命令行参数 | 默认值 | 说明 |
 |--------|----------|------------|---------|------|
-| 调试模式 | DEBUG | -debug | false | 是否启用调试日志 |
-| 服务端口 | SERVER_PORT | -port | 8080 | HTTP 服务监听端口 |
-| 服务域名 | SERVER_DOMAIN | -domain | http://localhost:8080 | 服务访问域名 |
-| 访问令牌 | TOKEN | -token | "" | API 访问认证令牌 |
+| 调试模式 | DEBUG | -debug | `false` | 是否启用调试日志 |
+| 服务端口 | SERVER_PORT | -port | `8080` | HTTP 服务监听端口 |
+| 服务域名 | SERVER_DOMAIN | -domain | `http://localhost:8080` | 服务访问域名 |
+| 访问令牌 | TOKEN | -token | `""`(空字符串) | API 访问认证令牌 |
 
 ## API 使用说明
 
