@@ -18,6 +18,11 @@
   - 容器友好的健康检查接口
   - 自定义域名和端口
 
+## 教程文档
+
+- 《[使用 AI 辅助开发一个开源 IP 信息查询工具：一](https://soulteary.com/2024/12/21/use-ai-to-assist-in-developing-an-open-source-ip-information-tool-part-1.html)》
+- 《[使用 AI 辅助开发一个开源 IP 信息查询工具：二](https://soulteary.com/2024/12/23/use-ai-to-assist-in-developing-an-open-source-ip-information-tool-part-2.html)》
+
 ## 快速开始
 
 TBD
