@@ -1,11 +1,11 @@
 # IP Helper
 
-一个功能强大的多协议 IP 信息查询服务器。
+一个简洁的、支持多协议查询 IP 信息的工具。
 
 ## 主要特性
 
 - **多协议支持**
-  - HTTP/HTTPS Web 界面访问
+  - Web 界面访问
   - CURL/Wget 命令行工具查询
   - Telnet 协议查询
   - FTP 协议查询
@@ -13,28 +13,12 @@
   - IP 地理位置查询
   - Token 认证机制
   - Gzip 压缩支持
-  - 健康检查接口
+  - 容器友好的健康检查接口
   - 自定义域名和端口
 
 ## 快速开始
 
-### 环境要求
-
-- Go 1.x 或更高版本
-
-### 安装部署
-
-```bash
-git clone https://github.com/soulteary/ip-helper.git
-cd ip-helper
-go build
-```
-
-### 启动服务
-
-```bash
-./ip-helper
-```
+TBD
 
 ## 配置说明
 
