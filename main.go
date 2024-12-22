@@ -4,6 +4,7 @@ import (
 	"embed"
 	"log"
 
+	"github.com/soulteary/ip-helper/model/define"
 	"github.com/soulteary/ip-helper/model/ftp"
 	ipInfo "github.com/soulteary/ip-helper/model/ip-info"
 	configParser "github.com/soulteary/ip-helper/model/parse-config"
@@ -24,6 +25,6 @@ func main() {
 	}
 
 	go telnet.Server(&ipdb)
-	go ftp.Server(&ipdb)
+	go ftp.Server(&ipdb, define.FTP_PORT)
 	web.Server(config, &ipdb)
 }
