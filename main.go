@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"embed"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -228,7 +229,22 @@ func cacheMiddleware() gin.HandlerFunc {
 	}
 }
 
-func TelnetServer() {
+// 从包含端口的地址中，获取客户端 IP 地址
+func getBaseIP(addrWithPort string) string {
+	host, _, err := net.SplitHostPort(addrWithPort)
+	if err != nil {
+		return ""
+	}
+	return host
+}
+
+// 生成 JSON 数据
+func renderJSON(ipaddr string, dbInfo []string) map[string]any {
+	return map[string]any{"ip": ipaddr, "info": dbInfo}
+}
+
+// 添加 IPDB 参数
+func TelnetServer(ipdb *IPDB) {
 	listener, err := net.Listen("tcp", ":23")
 	if err != nil {
 		fmt.Printf("无法启动telnet服务器: %v\n", err)
@@ -244,20 +260,31 @@ func TelnetServer() {
 			fmt.Printf("接受连接时发生错误: %v\n", err)
 			continue
 		}
-
-		go handleConnection(conn)
+		// 将 IPDB 参数传入处理函数
+		go handleConnection(ipdb, conn)
 	}
 }
 
-func handleConnection(conn net.Conn) {
+// 添加 IPDB 参数
+func handleConnection(ipdb *IPDB, conn net.Conn) {
 	defer conn.Close()
 
-	// 获取客户端 IP 地址
-	clientIP := conn.RemoteAddr().String()
-
+	// 去除端口号的 IP 地址
+	clientIP := getBaseIP(conn.RemoteAddr().String())
+	// 去除端口号，查询详细信息
+	info := ipdb.FindByIPIP(clientIP)
 	// 发送消息给客户端
-	message := fmt.Sprintf("Hello World\n您的 IP 地址是: %s\n", clientIP)
-	_, err := conn.Write([]byte(message))
+	sendBuf := [][]byte{}
+	message, err := json.Marshal(renderJSON(clientIP, info))
+	// 发生错误时，打印错误信息
+	if err != nil {
+		fmt.Println("序列化 JSON 数据时发生错误: ", err)
+		return
+	}
+	// 添加消息到发送缓冲区，确保消息以 CRLF 结尾
+	sendBuf = append(sendBuf, message)
+	sendBuf = append(sendBuf, []byte("\r\n"))
+	_, err = conn.Write(bytes.Join(sendBuf, []byte("")))
 	if err != nil {
 		fmt.Printf("发送消息时发生错误: %v\n", err)
 		return
@@ -340,10 +367,6 @@ func main() {
 		return template
 	}
 
-	renderJSON := func(ipaddr string, dbInfo []string) map[string]any {
-		return map[string]any{"ip": ipaddr, "info": dbInfo}
-	}
-
 	globalTemplate := []byte{}
 	err := error(nil)
 
@@ -414,7 +437,8 @@ func main() {
 		}
 	})
 
-	go TelnetServer()
+	// 将 IPDB 参数传入 TelnetServer
+	go TelnetServer(&ipdb)
 
 	serverAddr := fmt.Sprintf(":%s", config.Port)
 	log.Printf("启动服务器于 %s:%s\n", config.Domain, config.Port)
