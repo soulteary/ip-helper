@@ -48,7 +48,7 @@ func HandleConnection(ipdb *ipInfo.IPDB, conn net.Conn) {
 	}
 	_, err := conn.Write(bytes.Join(sendBuf, []byte(" ")))
 	if err != nil {
-		log.Println("发送消息时发生错误: ", err)
+		log.Println("FTP 服务发送消息时发生错误: ", err)
 		return
 	}
 	conn.Close()

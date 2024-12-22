@@ -24,7 +24,7 @@ func main() {
 		return
 	}
 
-	go telnet.Server(&ipdb)
+	go telnet.Server(&ipdb, define.TELNET_PORT)
 	go ftp.Server(&ipdb, define.FTP_PORT)
 	web.Server(config, &ipdb)
 }
