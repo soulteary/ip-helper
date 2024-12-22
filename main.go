@@ -164,7 +164,11 @@ type IPForm struct {
 func main() {
 	config := configParser.Parse()
 
-	ipdb := ipInfo.InitIPDB()
+	ipdb, err := ipInfo.InitIPDB("./data/ipipfree.ipdb")
+	if err != nil {
+		log.Fatalf("初始化 IP 数据库失败: %v\n", err)
+		return
+	}
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
@@ -209,7 +213,6 @@ func main() {
 	}
 
 	globalTemplate := []byte{}
-	err := error(nil)
 
 	r.GET("/", func(c *gin.Context) {
 		if len(globalTemplate) == 0 {
