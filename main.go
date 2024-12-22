@@ -17,6 +17,7 @@ import (
 	static "github.com/soulteary/gin-static"
 	"github.com/soulteary/ip-helper/model/define"
 	fn "github.com/soulteary/ip-helper/model/fn"
+	ipInfo "github.com/soulteary/ip-helper/model/ip-info"
 	configParser "github.com/soulteary/ip-helper/model/parse-config"
 	"github.com/soulteary/ipdb-go"
 )
@@ -38,54 +39,12 @@ func authMiddleware(config *define.Config) gin.HandlerFunc {
 	}
 }
 
-type IPInfo struct {
-	ClientIP     string `json:"client_ip"`
-	ProxyIP      string `json:"proxy_ip,omitempty"`
-	IsProxy      bool   `json:"is_proxy"`
-	ForwardedFor string `json:"forwarded_for,omitempty"`
-	RealIP       string `json:"real_ip"`
-}
-
 func IPAnalyzer() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ipInfo := analyzeIP(c)
+		ipInfo := ipInfo.AnalyzeRequestData(c)
 		c.Set("ip_info", ipInfo)
 		c.Next()
 	}
-}
-
-func analyzeIP(c *gin.Context) IPInfo {
-	var ipInfo IPInfo
-
-	ipInfo.ClientIP = c.ClientIP()
-
-	forwardedFor := c.GetHeader("X-Forwarded-For")
-	if forwardedFor != "" {
-		ipInfo.ForwardedFor = forwardedFor
-		ips := strings.Split(forwardedFor, ",")
-		if len(ips) > 0 {
-			ipInfo.RealIP = strings.TrimSpace(ips[0])
-			if len(ips) > 1 {
-				ipInfo.IsProxy = true
-				ipInfo.ProxyIP = strings.TrimSpace(ips[len(ips)-1])
-			}
-		}
-	} else {
-		ipInfo.RealIP = ipInfo.ClientIP
-	}
-
-	xRealIP := c.GetHeader("X-Real-IP")
-	if xRealIP != "" && xRealIP != ipInfo.RealIP {
-		ipInfo.IsProxy = true
-		ipInfo.ProxyIP = ipInfo.ClientIP
-		ipInfo.RealIP = xRealIP
-	}
-
-	if fn.IsPrivateIP(ipInfo.ClientIP) {
-		ipInfo.IsProxy = true
-	}
-
-	return ipInfo
 }
 
 func cacheMiddleware() gin.HandlerFunc {
@@ -249,11 +208,11 @@ func main() {
 
 	getClientIPInfo := func(c *gin.Context, ipaddr string) (resultIP string, resultDBInfo []string, err error) {
 		if ipaddr == "" {
-			ipInfo, exists := c.Get("ip_info")
+			info, exists := c.Get("ip_info")
 			if !exists {
 				return resultIP, resultDBInfo, fmt.Errorf("IP info not found")
 			}
-			ipaddr = ipInfo.(IPInfo).RealIP
+			ipaddr = info.(ipInfo.Info).RealIP
 		}
 
 		dbInfo := ipdb.FindByIPIP(ipaddr)
@@ -297,7 +256,7 @@ func main() {
 	})
 
 	r.POST("/", func(c *gin.Context) {
-		ipInfo, exists := c.Get("ip_info")
+		info, exists := c.Get("ip_info")
 		if !exists {
 			c.JSON(500, gin.H{"error": "IP info not found"})
 			return
@@ -305,23 +264,23 @@ func main() {
 		ip := ""
 		var form IPForm
 		if err := c.ShouldBind(&form); err != nil {
-			ip = ipInfo.(IPInfo).RealIP
+			ip = info.(ipInfo.Info).RealIP
 		} else {
 			ip = form.IP
 			if !fn.IsValidIPAddress(ip) {
-				ip = ipInfo.(IPInfo).RealIP
+				ip = info.(ipInfo.Info).RealIP
 			}
 		}
 		c.Redirect(302, fmt.Sprintf("/ip/%s", ip))
 	})
 
 	r.GET("/ip", func(c *gin.Context) {
-		ipInfo, exists := c.Get("ip_info")
+		info, exists := c.Get("ip_info")
 		if !exists {
 			c.JSON(500, gin.H{"error": "IP info not found"})
 			return
 		}
-		c.String(200, ipInfo.(IPInfo).ClientIP)
+		c.String(200, info.(ipInfo.Info).ClientIP)
 	})
 
 	r.GET("/ip/:ip", func(c *gin.Context) {
