@@ -228,9 +228,7 @@ func cacheMiddleware() gin.HandlerFunc {
 	}
 }
 
-// Telnet 服务器
 func TelnetServer() {
-	// telnet默认端口是 23
 	listener, err := net.Listen("tcp", ":23")
 	if err != nil {
 		fmt.Printf("无法启动telnet服务器: %v\n", err)
@@ -240,7 +238,6 @@ func TelnetServer() {
 
 	fmt.Println("Telnet服务器已启动，监听端口 23...")
 
-	// 持续接受新的连接
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -248,7 +245,6 @@ func TelnetServer() {
 			continue
 		}
 
-		// 为每个连接创建一个新的goroutine
 		go handleConnection(conn)
 	}
 }
@@ -268,6 +264,28 @@ func handleConnection(conn net.Conn) {
 	}
 }
 
+type IPDB struct {
+	IPIP *ipdb.City
+}
+
+// 初始化 IPDB 数据库实例
+func initIPDB() IPDB {
+	db, err := ipdb.NewCity("./data/ipipfree.ipdb")
+	if err != nil {
+		log.Fatal(err)
+	}
+	return IPDB{IPIP: db}
+}
+
+// 根据 IP 地址查询信息（IPIP 数据库）
+func (db IPDB) FindByIPIP(ip string) []string {
+	info, err := db.IPIP.Find(ip, "CN")
+	if err != nil {
+		info = []string{"未找到 IP 地址信息"}
+	}
+	return removeDuplicates(info)
+}
+
 //go:embed public
 var EmbedFS embed.FS
 
@@ -278,10 +296,8 @@ type IPForm struct {
 func main() {
 	config := parseConfig()
 
-	db, err := ipdb.NewCity("./data/ipipfree.ipdb")
-	if err != nil {
-		log.Fatal(err)
-	}
+	// 初始化 IPDB 数据库
+	ipdb := initIPDB()
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
@@ -311,11 +327,8 @@ func main() {
 			ipaddr = ipInfo.(IPInfo).RealIP
 		}
 
-		dbInfo, err := db.Find(ipaddr, "CN")
-		if err != nil {
-			dbInfo = []string{"未找到 IP 地址信息"}
-		}
-		dbInfo = removeDuplicates(dbInfo)
+		// 简化 IP 地址查询
+		dbInfo := ipdb.FindByIPIP(ipaddr)
 		return ipaddr, dbInfo, nil
 	}
 
@@ -332,6 +345,7 @@ func main() {
 	}
 
 	globalTemplate := []byte{}
+	err := error(nil)
 
 	r.GET("/", func(c *gin.Context) {
 		if len(globalTemplate) == 0 {
@@ -400,7 +414,6 @@ func main() {
 		}
 	})
 
-	// 启动 Telnet 服务器
 	go TelnetServer()
 
 	serverAddr := fmt.Sprintf(":%s", config.Port)
