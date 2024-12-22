@@ -19,7 +19,6 @@ import (
 	fn "github.com/soulteary/ip-helper/model/fn"
 	ipInfo "github.com/soulteary/ip-helper/model/ip-info"
 	configParser "github.com/soulteary/ip-helper/model/parse-config"
-	"github.com/soulteary/ipdb-go"
 )
 
 func authMiddleware(config *define.Config) gin.HandlerFunc {
@@ -71,7 +70,7 @@ func renderJSON(ipaddr string, dbInfo []string) map[string]any {
 	return map[string]any{"ip": ipaddr, "info": dbInfo}
 }
 
-func TelnetServer(ipdb *IPDB) {
+func TelnetServer(ipdb *ipInfo.IPDB) {
 	listener, err := net.Listen("tcp", ":23")
 	if err != nil {
 		fmt.Printf("无法启动telnet服务器: %v\n", err)
@@ -91,7 +90,7 @@ func TelnetServer(ipdb *IPDB) {
 	}
 }
 
-func handleTelnetConnection(ipdb *IPDB, conn net.Conn) {
+func handleTelnetConnection(ipdb *ipInfo.IPDB, conn net.Conn) {
 	defer conn.Close()
 
 	clientIP := fn.GetBaseIP(conn.RemoteAddr().String())
@@ -113,7 +112,7 @@ func handleTelnetConnection(ipdb *IPDB, conn net.Conn) {
 	}
 }
 
-func FTPServer(ipdb *IPDB) {
+func FTPServer(ipdb *ipInfo.IPDB) {
 	listener, err := net.Listen("tcp", ":21")
 	if err != nil {
 		log.Fatalf("Error creating server: %v", err)
@@ -132,7 +131,7 @@ func FTPServer(ipdb *IPDB) {
 	}
 }
 
-func handleFTPConnection(ipdb *IPDB, conn net.Conn) {
+func handleFTPConnection(ipdb *ipInfo.IPDB, conn net.Conn) {
 	defer conn.Close()
 
 	clientIP := fn.GetBaseIP(conn.RemoteAddr().String())
@@ -155,26 +154,6 @@ func handleFTPConnection(ipdb *IPDB, conn net.Conn) {
 	conn.Close()
 }
 
-type IPDB struct {
-	IPIP *ipdb.City
-}
-
-func initIPDB() IPDB {
-	db, err := ipdb.NewCity("./data/ipipfree.ipdb")
-	if err != nil {
-		log.Fatal(err)
-	}
-	return IPDB{IPIP: db}
-}
-
-func (db IPDB) FindByIPIP(ip string) []string {
-	info, err := db.IPIP.Find(ip, "CN")
-	if err != nil {
-		info = []string{"未找到 IP 地址信息"}
-	}
-	return fn.RemoveDuplicates(info)
-}
-
 //go:embed public
 var EmbedFS embed.FS
 
@@ -185,7 +164,7 @@ type IPForm struct {
 func main() {
 	config := configParser.Parse()
 
-	ipdb := initIPDB()
+	ipdb := ipInfo.InitIPDB()
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
