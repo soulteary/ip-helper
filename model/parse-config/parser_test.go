@@ -10,6 +10,7 @@ import (
 
 // cleanEnv 清理测试用的环境变量
 func cleanEnv() {
+	os.Unsetenv("DEBUG")
 	os.Unsetenv("SERVER_PORT")
 	os.Unsetenv("SERVER_DOMAIN")
 	os.Unsetenv("TOKEN")
@@ -52,6 +53,9 @@ func TestParseDefault(t *testing.T) {
 	if config.Token != "" {
 		t.Errorf("Expected default token to be empty, got %s", config.Token)
 	}
+	if config.Debug {
+		t.Error("Expected default debug to be false, got true")
+	}
 }
 
 // TestParseCommandLine 测试命令行参数解析
@@ -67,6 +71,7 @@ func TestParseCommandLine(t *testing.T) {
 		"-port", "9090",
 		"-domain", "https://example.com",
 		"-token", "test-token",
+		"-debug",
 	}
 
 	config := configParser.Parse()
@@ -81,6 +86,9 @@ func TestParseCommandLine(t *testing.T) {
 	if config.Token != "test-token" {
 		t.Errorf("Expected token to be test-token, got %s", config.Token)
 	}
+	if !config.Debug {
+		t.Error("Expected debug to be true, got false")
+	}
 }
 
 // TestParseEnvironment 测试环境变量解析
@@ -94,6 +102,7 @@ func TestParseEnvironment(t *testing.T) {
 	os.Setenv("SERVER_PORT", "7070")
 	os.Setenv("SERVER_DOMAIN", "https://test.com")
 	os.Setenv("TOKEN", "env-token")
+	os.Setenv("DEBUG", "true")
 
 	config := configParser.Parse()
 
@@ -106,6 +115,9 @@ func TestParseEnvironment(t *testing.T) {
 	}
 	if config.Token != "env-token" {
 		t.Errorf("Expected token to be env-token, got %s", config.Token)
+	}
+	if !config.Debug {
+		t.Error("Expected debug to be true, got false")
 	}
 }
 
@@ -120,6 +132,7 @@ func TestParsePriority(t *testing.T) {
 	os.Setenv("SERVER_PORT", "7070")
 	os.Setenv("SERVER_DOMAIN", "https://test.com")
 	os.Setenv("TOKEN", "env-token")
+	os.Setenv("DEBUG", "true")
 
 	// 设置命令行参数
 	os.Args = []string{
@@ -127,6 +140,7 @@ func TestParsePriority(t *testing.T) {
 		"-port", "9090",
 		"-domain", "https://example.com",
 		"-token", "test-token",
+		"-debug", "false",
 	}
 
 	config := configParser.Parse()
@@ -140,5 +154,8 @@ func TestParsePriority(t *testing.T) {
 	}
 	if config.Token != "test-token" {
 		t.Errorf("Expected token to be test-token (command line), got %s", config.Token)
+	}
+	if config.Debug {
+		t.Error("Expected debug to be false (command line), got true")
 	}
 }
