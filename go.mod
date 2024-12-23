@@ -6,7 +6,7 @@ require (
 	github.com/gin-contrib/gzip v1.0.1
 	github.com/gin-gonic/gin v1.10.0
 	github.com/soulteary/gin-static v0.2.5
-	github.com/soulteary/ipdb-go v0.0.1
+	github.com/soulteary/ipdb-go v0.1.0
 )
 
 require (
