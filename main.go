@@ -1,8 +1,16 @@
+/**
+ * Copyright (c) 2024-2025 Su Yang (soulteary)
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
 package main
 
 import (
 	"embed"
-	"log"
+	"fmt"
+	"os"
 
 	"github.com/soulteary/ip-helper/model/define"
 	"github.com/soulteary/ip-helper/model/ftp"
@@ -20,7 +28,9 @@ func main() {
 
 	ipdb, err := ipInfo.InitIPDB("./data/ipipfree.ipdb")
 	if err != nil {
-		log.Fatalf("初始化 IP 数据库失败: %v\n", err)
+		fmt.Println("初始化 IP 数据库失败: ", err)
+		fmt.Println("请自行准备数据库文件，并确保 data/ipipfree.ipdb 路径文件存在")
+		os.Exit(1)
 		return
 	}
 
